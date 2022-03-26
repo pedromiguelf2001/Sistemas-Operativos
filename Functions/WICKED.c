@@ -5,8 +5,10 @@
 #include <signal.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <sys/wait.h>
 
 #define BUFFSIZE 2048
+
 
 //guarda as transformações
 typedef struct lligada {
@@ -132,8 +134,20 @@ Transformacao armazenaExtensao(Transformacao t,char *origem){
                 aux_bcompress->estado = 0;
             }
             else{
-                strcpy(temp->extensao,prev->extensao);
-            } 
+                if (temp->prox == NULL){
+                    strcpy(temp->extensao,"txt");
+                }
+                else{
+                    if (!strcmp(temp->prox->transformacao, "bdecompress"))
+                        strcpy(temp->extensao,"bzip"); 
+                    if (!strcmp(temp->prox->transformacao, "gdecompress"))
+                        strcpy(temp->extensao,"gzip"); 
+                    if (!strcmp(temp->prox->transformacao, "decrypt"))
+                        strcpy(temp->extensao,"cpt");    
+                    if (!strcmp(temp->prox->transformacao, "nop"))
+                        strcpy(temp->extensao,"txt");      
+                    }
+            }
         }
 
 
@@ -151,7 +165,19 @@ Transformacao armazenaExtensao(Transformacao t,char *origem){
                 aux_gcompress->estado = 0;
             }
             else{
-                strcpy(temp->extensao,prev->extensao);
+                if (temp->prox == NULL){
+                    strcpy(temp->extensao,"txt");
+                }
+                else{
+                    if (!strcmp(temp->prox->transformacao, "bdecompress"))
+                        strcpy(temp->extensao,"bzip"); 
+                    if (!strcmp(temp->prox->transformacao, "gdecompress"))
+                        strcpy(temp->extensao,"gzip"); 
+                    if (!strcmp(temp->prox->transformacao, "decrypt"))
+                        strcpy(temp->extensao,"cpt");    
+                    if (!strcmp(temp->prox->transformacao, "nop"))
+                        strcpy(temp->extensao,"txt");      
+                    }
             }
         }
 
@@ -170,7 +196,20 @@ Transformacao armazenaExtensao(Transformacao t,char *origem){
                 aux_encrypt->estado = 0;
             }
             else{
-                strcpy(temp->extensao,prev->extensao);
+                if (temp->prox == NULL){
+                    strcpy(temp->extensao,"txt");
+                }
+                else{
+                    if (!strcmp(temp->prox->transformacao, "bdecompress"))
+                        strcpy(temp->extensao,"bzip"); 
+                    if (!strcmp(temp->prox->transformacao, "gdecompress"))
+                        strcpy(temp->extensao,"gzip"); 
+                    if (!strcmp(temp->prox->transformacao, "decrypt"))
+                        strcpy(temp->extensao,"cpt");    
+                    if (!strcmp(temp->prox->transformacao, "nop"))
+                        strcpy(temp->extensao,"txt");      
+                    }
+                }
             }
         }
 
@@ -192,19 +231,10 @@ Transformacao armazenaExtensao(Transformacao t,char *origem){
 
 
 
-void constroiFicheiro(char *nome_ficheiro, char *extensao, char *final, int flag){
-    if (flag){
-        strcat(final,"<");
+void constroiFicheiro(char *nome_ficheiro, char *extensao, char *final){
         strcat(final,nome_ficheiro);
         strcat(final,".");
         strcat(final,extensao);
-        strcat(final, ">");
-    }
-    else{
-        strcat(final,nome_ficheiro);
-        strcat(final,".");
-        strcat(final,extensao);
-    }
 }
 
 
@@ -214,6 +244,8 @@ void constroiFicheiro(char *nome_ficheiro, char *extensao, char *final, int flag
 
 
 void correrConfs(Transformacao t, char *ficheiro){
+    int status;
+
     Transformacao temp = t;
     Transformacao prev = NULL;
     char *copia;
@@ -238,22 +270,137 @@ void correrConfs(Transformacao t, char *ficheiro){
     while(temp){
         char *origem;
         origem = malloc(BUFFSIZE);
-        constroiFicheiro(nome_ficheiro,prev->extensao,origem,1);
-        printf("origem: %s\n",origem);
+        constroiFicheiro(nome_ficheiro,prev->extensao,origem);
+        //printf("origem: %s\n",origem);
         char *destino;
         destino = malloc(BUFFSIZE);
-        constroiFicheiro(nome_ficheiro,temp->extensao,destino,0);
-        printf("destino: %s\n",destino);
+        constroiFicheiro(nome_ficheiro,temp->extensao,destino);
+        //printf("destino: %s\n",destino);
+        //printf("-----------------\n");
+        int ori;
+        int dest;
+        pid_t pid;
+        
         if (!strcmp(temp->transformacao,"encrypt")){
-            
-            
-	        execlp("/home/pedromiguelf/Desktop/SO/Projeto/Trabalho-SO/Functions","/encrypt",origem, destino);
-
-            perror("error executing command");
-            printf("done\n");
+            ori = open(origem, O_RDONLY, 0600);
+            dest = open(destino, O_CREAT | O_TRUNC | O_WRONLY, 0600);
+            dup2(ori, STDIN_FILENO);
+            dup2(dest, STDOUT_FILENO);
+            close(ori);
+            close(dest);
+            pid = fork();
+            if (pid == 0){
+                int ret = execl("/home/pedrof/Desktop/SO/Projeto/Functions/encrypt","/encrypt",origem, destino,NULL);
+                perror("error executing command");
+                _exit(ret);
+            }	
+            else{
+                wait(&status); 
+            }
         }
-
-    
+        if (!strcmp(temp->transformacao,"bcompress")){
+            ori = open(origem, O_RDONLY, 0600);
+            dest = open(destino, O_CREAT | O_TRUNC | O_WRONLY, 0600);
+            dup2(ori, STDIN_FILENO);
+            dup2(dest, STDOUT_FILENO);
+            close(ori);
+            close(dest);
+            pid = fork();
+            if (pid == 0){
+                int ret = execl("/home/pedrof/Desktop/SO/Projeto/Functions/bcompress","/bcompress",origem, destino,NULL);
+                perror("error executing command");
+                _exit(ret);
+            }	
+            else{
+                wait(&status);
+            }
+        }
+        if (!strcmp(temp->transformacao,"gcompress")){
+            ori = open(origem, O_RDONLY, 0600);
+            dest = open(destino, O_CREAT | O_TRUNC | O_WRONLY, 0600);
+            dup2(ori, STDIN_FILENO);
+            dup2(dest, STDOUT_FILENO);
+            close(ori);
+            close(dest);
+            pid = fork();
+            if (pid == 0){
+                int ret = execl("/home/pedrof/Desktop/SO/Projeto/Functions/gcompress","/gcompress",origem, destino,NULL);
+                perror("error executing command");
+                _exit(ret);
+            }	
+            else{
+                wait(&status);
+            }
+        }
+        if (!strcmp(temp->transformacao,"bdecompress")){
+            ori = open(origem, O_RDONLY, 0600);
+            dest = open(destino, O_CREAT | O_TRUNC | O_WRONLY, 0600);
+            dup2(ori, STDIN_FILENO);
+            dup2(dest, STDOUT_FILENO);
+            close(ori);
+            close(dest);
+            pid = fork();
+            if (pid == 0){
+                int ret = execl("/home/pedrof/Desktop/SO/Projeto/Functions/bdecompress","/bdecompress",origem, destino,NULL);
+                perror("error executing command");
+                _exit(ret);
+            }	
+            else{
+                wait(&status);
+            }
+        }
+        if (!strcmp(temp->transformacao,"decrypt")){
+            ori = open(origem, O_RDONLY, 0600);
+            dest = open(destino, O_CREAT | O_TRUNC | O_WRONLY, 0600);
+            dup2(ori, STDIN_FILENO);
+            dup2(dest, STDOUT_FILENO);
+            close(ori);
+            close(dest);
+            pid = fork();
+            if (pid == 0){
+                int ret = execl("/home/pedrof/Desktop/SO/Projeto/Functions/decrypt","/decrypt",origem, destino,NULL);
+                perror("error executing command");
+                _exit(ret);
+            }	
+            else{
+                wait(&status);
+            }
+        }
+        if (!strcmp(temp->transformacao,"gdecompress")){
+            ori = open(origem, O_RDONLY, 0600);
+            dest = open(destino, O_CREAT | O_TRUNC | O_WRONLY, 0600);
+            dup2(ori, STDIN_FILENO);
+            dup2(dest, STDOUT_FILENO);
+            close(ori);
+            close(dest);
+            pid = fork();
+            if (pid == 0){
+                int ret = execl("/home/pedrof/Desktop/SO/Projeto/Functions/gdecompress","/gdecompress",origem, destino,NULL);
+                perror("error executing command");
+                _exit(ret);
+            }	
+            else{
+                wait(&status);
+            }
+        }
+        // if (!strcmp(temp->transformacao,"nop")){
+        //     ori = open(origem, O_RDONLY, 0600);
+        //     //dest = open(destino, O_CREAT | O_TRUNC | O_WRONLY, 0600);
+        //     dup2(ori, STDIN_FILENO);
+        //     //dup2(dest, STDOUT_FILENO);
+        //     close(ori);
+        //     //close(dest);
+        //     pid = fork();
+        //     if (pid == 0){
+        //         int ret = execl("/home/pedrof/Desktop/SO/Projeto/Functions/nop","/nop",origem,NULL);
+        //         perror("error executing command");
+        //         _exit(ret);
+        //     }	
+        //     else{
+        //         wait(&status);
+        //     }
+        // }
+        
     prev = temp;
     temp = temp->prox;
     
@@ -287,4 +434,3 @@ int main(int argc, char* argv[]) {
 
 	return EXIT_SUCCESS;
 }
-
