@@ -6,22 +6,10 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
-
+#include "structs.h"
 
 char s2c_fifo_name[512];
 char * error = "FIFO pipe already exists!";
-typedef struct process{
-    int pid;
-    int argc;
-    char argv[32][32];
-}Process;
-
-typedef struct reply{
-    
-    int argc;
-    char argv[256][2048];
-    int end_flag;
-}Reply;
 
 /*
     Esta função copia os argumentos passados à função main para um processo
@@ -62,6 +50,12 @@ void proc_file(int fd, int argc, char **argv){
     process.pid = pid;
     process.argc = argc - 1;
     copy_argv(process, argc, argv);
+    printf("%d\n",process.pid);
+    printf("%d\n",process.argc);
+    printf("%s\n",process.argv[0]);
+
+
+    
     write(fd, &process, sizeof(Process));
 }
 
@@ -73,17 +67,18 @@ void closer(int signum){
 
 int main(int argc, char** argv){
 
-
+    //printf("monkaS");
     signal(SIGINT, closer);
     signal(SIGTERM, closer);
-
+    fflush(stdout);
     sprintf(s2c_fifo_name, "tmp/%d",(int)getpid());
 
     // Abrimos o pipe server to client
     if((mkfifo(s2c_fifo_name, 0666)) == -1){
         write(1,error,strlen(error));
+        return 1;
     }
-    // O programa é executado sem argumentos, aparece uma in 
+    O programa é executado sem argumentos, aparece uma in 
     if (argc == 1){
         char proc_file_help [1024];
         char status_help [1024];
@@ -105,18 +100,22 @@ int main(int argc, char** argv){
         int tma_size = sprintf(too_many_arguments, "sdstore: invalid command -> this command doesn't recieve any arguments!\n");
         write(1, too_many_arguments, tma_size);
     }
-    // Comandos corretos, logo enviamos para o pip client to server
+    Comandos corretos, logo enviamos para o pip client to server
     else if (
                 (!strcmp(argv[1], "proc-file")  && argc >  4)   ||
                 (!strcmp(argv[1], "status")     && argc == 2)
             ){
-        int c2s_fifo = open("tmp/c2s", O_WRONLY);
+        //printf("if");
+        int c2s_fifo = open("tmp/c2s_fifo", O_WRONLY);
+        //printf("1");
         proc_file(c2s_fifo, argc, argv);
+        //printf("2");
         close(c2s_fifo);
         reply();
     }
     // Comandos inexistentes
     else{
+        //printf("else");
         char undefined_command[1024];
         int uc_size = sprintf(undefined_command, "sdstore:  command %s is undefined!\n",argv[1]);
         write(1,undefined_command,uc_size);
