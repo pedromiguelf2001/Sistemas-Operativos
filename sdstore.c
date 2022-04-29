@@ -16,9 +16,9 @@ char * error = "FIFO pipe already exists!";
     que irá ser enviado pelo pipe client to server
 */
 
-void copy_argv(Process p, int argc, char** argv){
-    for(int i = 0; i < argc-1;i++){
-        strcpy(p.argv[i],argv[i]);
+void copy_argv(Process * p, int argc, char** argv){
+    for(int i = 0; i < argc;i++){
+        strcpy(p->argv[i],argv[i]);
     }
 }
 /*
@@ -46,16 +46,9 @@ void reply(){
 void proc_file(int fd, int argc, char **argv){
     Process process;
     int pid = getpid();
-
     process.pid = pid;
-    process.argc = argc - 1;
-    copy_argv(process, argc, argv);
-    printf("%d\n",process.pid);
-    printf("%d\n",process.argc);
-    printf("%s\n",process.argv[0]);
-
-
-    
+    process.argc = argc;
+    copy_argv(&process, argc, argv);
     write(fd, &process, sizeof(Process));
 }
 
@@ -78,7 +71,7 @@ int main(int argc, char** argv){
         write(1,error,strlen(error));
         return 1;
     }
-    O programa é executado sem argumentos, aparece uma in 
+    //O programa é executado sem argumentos, aparece uma in 
     if (argc == 1){
         char proc_file_help [1024];
         char status_help [1024];
@@ -100,7 +93,7 @@ int main(int argc, char** argv){
         int tma_size = sprintf(too_many_arguments, "sdstore: invalid command -> this command doesn't recieve any arguments!\n");
         write(1, too_many_arguments, tma_size);
     }
-    Comandos corretos, logo enviamos para o pip client to server
+    //Comandos corretos, logo enviamos para o pip client to server
     else if (
                 (!strcmp(argv[1], "proc-file")  && argc >  4)   ||
                 (!strcmp(argv[1], "status")     && argc == 2)

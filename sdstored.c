@@ -29,6 +29,20 @@ ssize_t readln(int fd, char *line, size_t size) {
 	return i;
 }
 
+void reply(char* msg, int client, int end_flag){
+    Reply reply;
+    // Carregar informação
+    strcpy(reply.argv[0], msg);
+    reply.argc = 1;
+    reply.end_flag = end_flag;
+    
+}
+
+
+
+
+
+
 // Guarda na lista ligada as transformacoes existentes e os seus max's
 Conf readConfig(char *config){
     int fd;
@@ -73,7 +87,7 @@ int possivel(Conf config,char *trans[]){
     
 }
 
-int pipe_Line(int argc, char *argv[],char *trans[]){
+int pipe_Line(int argc, char ** argv,char ** trans){
     int comandos = argc - 4;
     int n_pipes = comandos-1;
     int p[n_pipes][2];
@@ -161,6 +175,10 @@ int pipe_Line(int argc, char *argv[],char *trans[]){
 }
 
 
+void closer(int signum){
+    unlink("tmp/c2s_fifo");
+    exit(0);
+}
 
 
 
@@ -170,7 +188,8 @@ int main(int argc, char *argv[]) {
     printf("%d\n", server_pid);
 
     
-
+    signal(SIGINT, closer);
+    signal(SIGTERM, closer);
 
     Conf config = readConfig(argv[1]);
 
@@ -183,9 +202,9 @@ int main(int argc, char *argv[]) {
     while(1){
         // Abre o pipe Client to server
         int c2s_fifo = open("tmp/c2s_fifo", O_RDONLY);
-        while(read(c2s_fifo,&process, sizeof(Process)) > 0){
-            for(int i = 0; i < argc; i++){
-                    printf("%s\n",argv[i]);
+        while(read(c2s_fifo, &process, sizeof(Process)) > 0){
+            for(int i = 0; i < process.argc; i++){
+                    printf("%s\n",process.argv[i]);
                 }
             if(process.argc >= 5 && !strcmp(argv[1],"proc-file")){
                 
