@@ -202,7 +202,7 @@ int main(int argc, char *argv[]) {
     while(1){
         // Abre o pipe Client to server
         int c2s_fifo = open("tmp/c2s_fifo", O_RDONLY,0666);
-        while(read(c2s_fifo,&process, sizeof(Process)) > 0,0666){
+        while(read(c2s_fifo,&process, sizeof(Process)) > 0){
             if(process.argc >= 5 && !strcmp(process.argv[1],"proc-file")){
                 for(int i = 0; i < 2; i++){
                     files[i] = malloc(BUFFSIZE);

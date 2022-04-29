@@ -17,11 +17,7 @@ char * error = "FIFO pipe already exists!";
     que irá ser enviado pelo pipe client to server
 */
 
-<<<<<<< HEAD
-void copy_argv(Process * p, int argc, char** argv){
-=======
 void copy_argv(Process *p, int argc, char** argv){
->>>>>>> refs/remotes/origin/main
     for(int i = 0; i < argc;i++){
         strcpy(p->argv[i],argv[i]);
     }
