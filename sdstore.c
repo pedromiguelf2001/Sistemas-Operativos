@@ -1,3 +1,4 @@
+
 #include <fcntl.h>
 #include <signal.h>
 #include <stdio.h>
@@ -16,7 +17,11 @@ char * error = "FIFO pipe already exists!";
     que irá ser enviado pelo pipe client to server
 */
 
+<<<<<<< HEAD
 void copy_argv(Process * p, int argc, char** argv){
+=======
+void copy_argv(Process *p, int argc, char** argv){
+>>>>>>> refs/remotes/origin/main
     for(int i = 0; i < argc;i++){
         strcpy(p->argv[i],argv[i]);
     }
@@ -59,8 +64,6 @@ void closer(int signum){
 }
 
 int main(int argc, char** argv){
-
-    //printf("monkaS");
     signal(SIGINT, closer);
     signal(SIGTERM, closer);
     fflush(stdout);
@@ -98,17 +101,13 @@ int main(int argc, char** argv){
                 (!strcmp(argv[1], "proc-file")  && argc >  4)   ||
                 (!strcmp(argv[1], "status")     && argc == 2)
             ){
-        //printf("if");
         int c2s_fifo = open("tmp/c2s_fifo", O_WRONLY);
-        //printf("1");
         proc_file(c2s_fifo, argc, argv);
-        //printf("2");
         close(c2s_fifo);
         reply();
     }
     // Comandos inexistentes
     else{
-        //printf("else");
         char undefined_command[1024];
         int uc_size = sprintf(undefined_command, "sdstore:  command %s is undefined!\n",argv[1]);
         write(1,undefined_command,uc_size);

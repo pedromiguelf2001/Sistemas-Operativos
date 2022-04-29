@@ -8,7 +8,7 @@
 #include <wait.h>
 #include "structs.h"
 
-#define BUFFSIZE 2048
+#define BUFFSIZE 1024
 
 typedef struct lligada {
     char *transformacao;
@@ -87,89 +87,90 @@ int possivel(Conf config,char *trans[]){
     
 }
 
-int pipe_Line(int argc, char ** argv,char ** trans){
+int pipe_Line(int argc, char **files,char **trans){
+    printf("argc:%d\n",argc);
     int comandos = argc - 4;
     int n_pipes = comandos-1;
     int p[n_pipes][2];
     char* barra[comandos];
     for(int j = 0; j < comandos; j++){
-        char* t = malloc(BUFFSIZE);
-        strcat(t,"/");
-        strcat(t,trans[j]);
-        barra[j] = t;
+       char* t = malloc(BUFFSIZE);
+       strcat(t,"/");
+       strcat(t,trans[j]);
+       barra[j] = t;
     }
     for(int i = 0; i < comandos; i++){
-        char* path = malloc(BUFFSIZE);
-        strcat(path,"Functions/");
-        strcat(path,trans[i]);
-        //printf("%s\n",path);
-        //printf("%s\n",barra[i]);
-        int ori;
-        int dest;
-        pid_t pid;
-        int status;
-        int save = dup(STDOUT_FILENO);
-        ori = open(argv[2], O_RDONLY, 0600);
-        dest = open(argv[3], O_CREAT | O_TRUNC | O_WRONLY, 0600);
-        if(i == 0 && comandos <= 1){
+       char* path = malloc(BUFFSIZE);
+       strcat(path,"Functions/");
+       strcat(path,trans[i]);
+       //printf("%s\n",path);
+       //printf("%s\n",barra[i]);
+       int ori;
+       int dest;
+       pid_t pid;
+       int status;
+       int save = dup(STDOUT_FILENO);
+       ori = open(files[0], O_RDONLY, 0600);
+       dest = open(files[1], O_CREAT | O_TRUNC | O_WRONLY, 0600);
+       if(i == 0 && comandos <= 1){
+          if(fork() == 0){
+               dup2(dest,1);
+               dup2(ori,0);
+               int ret = execlp(path,barra[i],files[0],files[1],NULL);
+               perror("error executing command");
+               _exit(ret);
+           } 
+       }
+       else if(i == 0 && comandos > 1){
+           pipe(p[i]);
+           if(pipe(p[i]) == -1){
+               perror("PIPE:");
+               return -1;
+           }
            if(fork() == 0){
-                dup2(dest,1);
-                dup2(ori,0);
-                int ret = execlp(path,barra[i],argv[2],argv[3],NULL);
-                perror("error executing command");
-                _exit(ret);
-            } 
-        }
-        else if(i == 0 && comandos > 1){
-            pipe(p[i]);
-            if(pipe(p[i]) == -1){
-                perror("PIPE:");
-                return -1;
-            }
-            if(fork() == 0){
-                close(p[i][0]);
-                dup2(p[i][1],1);
-                dup2(ori,0);
-                //dup2(dest,1);
-                close(p[i][1]);
-                int ret = execlp(path,barra[i],argv[2],argv[3],NULL);
-                perror("error executing command");
-                _exit(ret);
-            }
-            else{
-                close(p[i][1]);
-            }
-        }
-        else if(i == (comandos-1)){
-            if(fork() == 0){
-                dup2(p[i-1][0],0);
-                dup2(dest,1);
-                close(p[i-1][0]);
-                int ret = execlp(path,barra[i],argv[2],argv[3],NULL);
-                perror("error executing command");
-                _exit(ret);
-            }
-            else{
-                close(p[i-1][0]);
-            }
-        }
-        else{
-            pipe(p[i]);
-            if(fork() == 0){
-                close(p[i][0]);
-                dup2(p[i-1][0],0);
-                close(p[i-1][0]);
-                dup2(p[i][1],1);
-                close(p[i][1]);
-                int ret = execlp(path,barra[i],argv[1],argv[2],NULL);
-                perror("error executing command");
-                _exit(ret);
-            }
-            else{
-                close(p[i-1][0]);
-                close(p[i][1]);
-            }
-        }
+               close(p[i][0]);
+               dup2(p[i][1],1);
+               dup2(ori,0);
+               //dup2(dest,1);
+               close(p[i][1]);
+               int ret = execlp(path,barra[i],files[0],files[1],NULL);
+               perror("error executing command");
+               _exit(ret);
+           }
+           else{
+               close(p[i][1]);
+           }
+       }
+       else if(i == (comandos-1)){
+           if(fork() == 0){
+               dup2(p[i-1][0],0);
+               dup2(dest,1);
+               close(p[i-1][0]);
+               int ret = execlp(path,barra[i],files[0],files[1],NULL);
+               perror("error executing command");
+               _exit(ret);
+           }
+           else{
+               close(p[i-1][0]);
+           }
+       }
+       else{
+           pipe(p[i]);
+           if(fork() == 0){
+               close(p[i][0]);
+               dup2(p[i-1][0],0);
+               close(p[i-1][0]);
+               dup2(p[i][1],1);
+               close(p[i][1]);
+               int ret = execlp(path,barra[i],files[0],files[1],NULL);
+               perror("error executing command");
+               _exit(ret);
+           }
+           else{
+               close(p[i-1][0]);
+               close(p[i][1]);
+           }
+       }
     }
     return 0;
 }
@@ -184,6 +185,7 @@ void closer(int signum){
 
 
 int main(int argc, char *argv[]) {
+    char *files[2];
     server_pid = getpid();
     printf("%d\n", server_pid);
 
@@ -192,22 +194,26 @@ int main(int argc, char *argv[]) {
     signal(SIGTERM, closer);
 
     Conf config = readConfig(argv[1]);
-
     if (mkfifo("tmp/c2s_fifo", 0666) == -1){
         perror("Estourou!\n");
         _exit(-1);
     }
-
     Process process;
     while(1){
         // Abre o pipe Client to server
-        int c2s_fifo = open("tmp/c2s_fifo", O_RDONLY);
-        while(read(c2s_fifo, &process, sizeof(Process)) > 0){
-            for(int i = 0; i < process.argc; i++){
-                    printf("%s\n",process.argv[i]);
+        int c2s_fifo = open("tmp/c2s_fifo", O_RDONLY,0666);
+        while(read(c2s_fifo,&process, sizeof(Process)) > 0,0666){
+            if(process.argc >= 5 && !strcmp(process.argv[1],"proc-file")){
+                for(int i = 0; i < 2; i++){
+                    files[i] = malloc(BUFFSIZE);
+                    strcpy(files[i],process.argv[i+2]);
                 }
-            if(process.argc >= 5 && !strcmp(argv[1],"proc-file")){
-                
+                char *transf[process.argc-4];
+                for(int i = 0; i < process.argc-4; i++){
+                    transf[i] = malloc(BUFFSIZE);
+                    strcpy(transf[i],process.argv[i+4]);
+                }
+                int x = pipe_Line(process.argc,files,transf);
             }
             else if(process.argc == 2 && !strcmp(argv[1],"status")){
 
