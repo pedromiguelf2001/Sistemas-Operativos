@@ -28,21 +28,14 @@ ssize_t readln(int fd, char *line, size_t size) {
 
 	return i;
 }
+
 void reply(char* msg, int client, int end_flag){
     Reply reply;
     // Carregar informação
     strcpy(reply.argv[0], msg);
     reply.argc = 1;
     reply.end_flag = end_flag;
-    int s2c_fifo;
-    char s2c_fifo_name[256];
-    sprintf(s2c_fifo_name,"tmp/%d", client);
-    if((s2c_fifo = open(s2c_fifo_name,O_WRONLY)) == -1){
-        perror("Error opening reply pipe");
-    }
-    write(s2c_fifo,&reply,sizeof(Reply));
-    close(s2c_fifo);
-    if (end_flag) unlink(s2c_fifo_name);
+    
 }
 
 
@@ -90,12 +83,67 @@ Conf readConfig(char *config){
 }
 
 
-int possivel(Conf config,char *trans[]){
-    
+int possivel(int n, char *trans[], Conf config){
+    int count;
+    Conf temp = config;
+    for(int i = 0; i < n; i++){
+        count = 0;
+        for(int j = i; j < n; j++){
+            if(!strcmp(trans[i],trans[j])){
+                printf("%s %d\n",trans[i],count);
+                count++;
+                }   
+            }
+        temp = config; 
+        while(temp){
+        if(!strcmp(trans[i],temp->transformacao)){
+            printf("Vou ver %d\n",count);
+            if(count > temp->max) return 0;
+            }
+            temp = temp->prox;
+        }
+        
+    }
+    printf("possivel\n");
+    return 1;
+}
+
+
+
+
+
+
+
+
+int atualiza_Struct(int n, char *trans[], Conf config){
+    Conf temp = config;
+    int flag;
+    for(int i = 0; i < n; i++){
+        flag = 1;
+        while(flag && temp){
+            if(!strcmp(temp->transformacao,trans[i])){
+                if(temp->atual > 0){
+                    temp->atual = temp->atual - 1;
+                }
+                else{
+                    return 0;
+                }
+                flag = 0;
+            }
+            temp = temp->prox;
+        }
+    }
+    Conf ola = config;
+    printf("----------------------------------------\n");
+
+    while(ola){
+        printf("%s | %d | %d\n",ola->transformacao,ola->max,ola->atual);
+        ola = ola->prox;
+    }
+    return 1;
 }
 
 int pipe_Line(int argc, char **files,char **trans){
-    printf("argc:%d\n",argc);
     int comandos = argc - 4;
     int n_pipes = comandos-1;
     int p[n_pipes][2];
@@ -179,6 +227,7 @@ int pipe_Line(int argc, char **files,char **trans){
            }
        }
     }
+    printf("Complete %s\n",trans[0]);
     return 0;
 }
 
@@ -211,16 +260,27 @@ int main(int argc, char *argv[]) {
         int c2s_fifo = open("tmp/c2s_fifo", O_RDONLY,0666);
         while(read(c2s_fifo,&process, sizeof(Process)) > 0){
             if(process.argc >= 5 && !strcmp(process.argv[1],"proc-file")){
-                for(int i = 0; i < 2; i++){
+                if(fork()==0){
+                    for(int i = 0; i < 2; i++){
                     files[i] = malloc(BUFFSIZE);
                     strcpy(files[i],process.argv[i+2]);
+                    }
+                    char *transf[process.argc-4];
+                    for(int i = 0; i < process.argc-4; i++){
+                        transf[i] = malloc(BUFFSIZE);
+                        strcpy(transf[i],process.argv[i+4]);
+                    }
+                    if(possivel(process.argc-4,transf,config)){
+                        if(fork()==0){
+                            //if(!strcmp(transf[0],"encrypt")) sleep(7); Isto prova que está a correr de forma concorrente, como os miudos em columbine quando ouviram os tiros
+                            int x = pipe_Line(process.argc,files,transf);
+                        }
+                    }
+                    else{
+                        write(1,"Wrong number of transformations",strlen("Wrong number of transformations"));
+                        return -1;
+                    }
                 }
-                char *transf[process.argc-4];
-                for(int i = 0; i < process.argc-4; i++){
-                    transf[i] = malloc(BUFFSIZE);
-                    strcpy(transf[i],process.argv[i+4]);
-                }
-                int x = pipe_Line(process.argc,files,transf);
             }
             else if(process.argc == 2 && !strcmp(argv[1],"status")){
 
