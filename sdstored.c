@@ -105,6 +105,30 @@ int possivel(int n, char *trans[], Conf config){
     return 1;
 }
 
+int possivel_atual(int n, char * trans[], Conf config){
+    printf("%d\n",n);
+    int count;
+    Conf temp = config;
+    for(int i = 0; i < n; i++){
+        count = 0;
+        for(int j = i; j < n; j++){
+            if(!strcmp(trans[i],trans[j])){
+                count++;
+                }   
+            }
+            printf("%d\n",count);
+        temp = config; 
+        while(temp){
+        if(!strcmp(trans[i],temp->transformacao)){
+            if(count > temp->atual) return 0;
+            }
+            temp = temp->prox;
+        }
+        
+    }
+    return 1;
+}
+
 
 
 
@@ -116,6 +140,7 @@ int possivel(int n, char *trans[], Conf config){
 int pipe_Line(int argc, char **files,char **trans, Conf config){
     int comandos = argc - 4;
     printf("%d\n",comandos);
+    fflush(stdout);
     Conf temp = config;
     int n_pipes = comandos-1;
     int p[n_pipes][2];
@@ -138,6 +163,9 @@ int pipe_Line(int argc, char **files,char **trans, Conf config){
        int save = dup(STDOUT_FILENO);
        ori = open(files[0], O_RDONLY, 0600);
        dest = open(files[1], O_CREAT | O_TRUNC | O_WRONLY, 0600);
+       if (!strcmp(trans[0], "nop") && comandos == 3){
+           sleep(10);
+       }
         if(i == 0 && comandos <= 1){
             if(fork() == 0){
                dup2(dest,1);
@@ -179,7 +207,7 @@ int pipe_Line(int argc, char **files,char **trans, Conf config){
            else{
                 wait(NULL);
                 close(p[i][1]);
-                printf("nao fork\n");
+                
                 temp = config;
                 while (temp){
                    if(!strcmp(trans[i], temp->transformacao)){
@@ -273,19 +301,16 @@ int atualiza_Struct(int n, char *trans[],char **files, Conf config){
             fflush(stdout);   
         }
   
-    if ( mkfifo("tmp/waiting", 0666) == -1){
-        perror("Read - Waiting Room");
-        _exit(-1);
-    }
+    
     Conf atual;
     Conf aux;
     aux = atual = config;
     int waiting_room = open("tmp/waiting", O_RDONLY | O_NONBLOCK, 0666);  
+    if(possivel_atual(n-4, trans,config)){
+        pipe_Line(n,files,trans,config);
+    }
+
     
-    int x = pipe_Line(n,files,trans,config);
-
-
-    printf("ola\n");
     while(read(waiting_room,&atual,sizeof(Conf)) > 0){
         while(atual){
             config->atual = atual->atual;
@@ -335,6 +360,10 @@ int main(int argc, char *argv[]) {
         perror("Estourou!\n");
         _exit(-1);
     }
+    if ( mkfifo("tmp/waiting", 0666) == -1){
+        perror("Read - Waiting Room");
+        _exit(-1);
+    }
     Process process;
     while(1){
         // Abre o pipe Client to server
@@ -354,6 +383,7 @@ int main(int argc, char *argv[]) {
                     if(possivel(process.argc-4,transf,config)){
                         if(fork()==0){
                             if(!strcmp(transf[0],"encrypt")) sleep(7); //Isto prova que está a correr de forma concorrente, como os miudos em columbine quando ouviram os tiros
+                            
                             atualiza_Struct(process.argc, transf,files, config);
                         }
                     }
