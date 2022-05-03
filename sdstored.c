@@ -90,21 +90,18 @@ int possivel(int n, char *trans[], Conf config){
         count = 0;
         for(int j = i; j < n; j++){
             if(!strcmp(trans[i],trans[j])){
-                printf("%s %d\n",trans[i],count);
                 count++;
                 }   
             }
         temp = config; 
         while(temp){
         if(!strcmp(trans[i],temp->transformacao)){
-            printf("Vou ver %d\n",count);
             if(count > temp->max) return 0;
             }
             temp = temp->prox;
         }
         
     }
-    printf("possivel\n");
     return 1;
 }
 
@@ -115,7 +112,140 @@ int possivel(int n, char *trans[], Conf config){
 
 
 
-int atualiza_Struct(int n, char *trans[], Conf config){
+
+int pipe_Line(int argc, char **files,char **trans, Conf config){
+    int comandos = argc - 4;
+    printf("%d\n",comandos);
+    Conf temp = config;
+    int n_pipes = comandos-1;
+    int p[n_pipes][2];
+    char* barra[comandos];
+    for(int j = 0; j < comandos; j++){
+       char* t = malloc(BUFFSIZE);
+       strcat(t,"/");
+       strcat(t,trans[j]);
+       barra[j] = t;
+    }
+    int waiting_room = open("tmp/waiting", O_WRONLY,0666);
+    for(int i = 0; i < comandos; i++){
+       char* path = malloc(BUFFSIZE);
+       strcat(path,"Functions/");
+       strcat(path,trans[i]);
+       int ori;
+       int dest;
+       pid_t pid;
+       int status;
+       int save = dup(STDOUT_FILENO);
+       ori = open(files[0], O_RDONLY, 0600);
+       dest = open(files[1], O_CREAT | O_TRUNC | O_WRONLY, 0600);
+        if(i == 0 && comandos <= 1){
+            if(fork() == 0){
+               dup2(dest,1);
+               dup2(ori,0);
+               int ret = execlp(path,barra[i],files[0],files[1],NULL);
+               perror("error executing command");
+               _exit(ret);
+            }
+            else{
+                wait(NULL);
+                while (temp){
+                    
+                    if(!strcmp(trans[i], temp->transformacao)){
+                        temp->atual = temp->atual + 1;
+                        
+                        break;
+                    }
+                    temp = temp->prox;
+                }
+                write(waiting_room, &config,sizeof(Conf) );
+            } 
+       }
+        else if(i == 0 && comandos > 1){
+           pipe(p[i]);
+           if(pipe(p[i]) == -1){
+               perror("PIPE:");
+               return -1;
+           }
+           if(fork() == 0){
+               
+               close(p[i][0]);
+               dup2(p[i][1],1);
+               dup2(ori,0);
+               close(p[i][1]);
+               int ret = execlp(path,barra[i],files[0],files[1],NULL);
+               perror("error executing command");
+               _exit(ret);
+           }
+           else{
+                wait(NULL);
+                close(p[i][1]);
+                printf("nao fork\n");
+                temp = config;
+                while (temp){
+                   if(!strcmp(trans[i], temp->transformacao)){
+                        temp->atual = temp->atual + 1;
+                        break;
+                   }
+                   temp = temp->prox;
+                }
+                    Conf ola = config;
+           }
+       }
+        else if(i == (comandos-1)){
+            if(fork() == 0){
+               dup2(p[i-1][0],0);
+               dup2(dest,1);
+               close(p[i-1][0]);
+               int ret = execlp(path,barra[i],files[0],files[1],NULL);
+               perror("error executing command");
+               _exit(ret);
+            }
+            else{
+                close(p[i-1][0]);
+                temp = config;
+                while (temp){
+                   if(!strcmp(trans[i], temp->transformacao)){
+                        temp->atual = temp->atual + 1;
+                        break;
+                   }
+                   temp = temp->prox;
+                }
+                write(waiting_room, &config,sizeof(Conf) );
+            }
+       }
+       else{
+           pipe(p[i]);
+           if(fork() == 0){
+               close(p[i][0]);
+               dup2(p[i-1][0],0);
+               close(p[i-1][0]);
+               dup2(p[i][1],1);
+               close(p[i][1]);
+               int ret = execlp(path,barra[i],files[0],files[1],NULL);
+               perror("error executing command");
+               _exit(ret);
+           }
+           else{
+                close(p[i-1][0]);
+                close(p[i][1]);
+                temp = config;
+                while (temp){
+                   if(!strcmp(trans[i], temp->transformacao)){
+                        temp->atual = temp->atual + 1;
+                        break;
+                   }
+                   temp = temp->prox;
+                }
+                write(waiting_room, &config,sizeof(Conf) );
+           }
+       }
+    }
+    printf("Complete %s\n",trans[0]);
+    return 0;
+}
+int atualiza_Struct(int n, char *trans[],char **files, Conf config){
+  
+
     Conf temp = config;
     int flag;
     for(int i = 0; i < n; i++){
@@ -136,104 +266,55 @@ int atualiza_Struct(int n, char *trans[], Conf config){
     Conf ola = config;
     printf("----------------------------------------\n");
 
-    while(ola){
-        printf("%s | %d | %d\n",ola->transformacao,ola->max,ola->atual);
-        ola = ola->prox;
+        while(ola){
+            printf("%s | %d | %d\n",ola->transformacao,ola->max,ola->atual);
+            
+            ola = ola->prox;
+            fflush(stdout);   
+        }
+  
+    if ( mkfifo("tmp/waiting", 0666) == -1){
+        perror("Read - Waiting Room");
+        _exit(-1);
     }
-    return 1;
-}
+    Conf atual;
+    Conf aux;
+    aux = atual = config;
+    int waiting_room = open("tmp/waiting", O_RDONLY | O_NONBLOCK, 0666);  
+    
+    int x = pipe_Line(n,files,trans,config);
 
-int pipe_Line(int argc, char **files,char **trans){
-    int comandos = argc - 4;
-    int n_pipes = comandos-1;
-    int p[n_pipes][2];
-    char* barra[comandos];
-    for(int j = 0; j < comandos; j++){
-       char* t = malloc(BUFFSIZE);
-       strcat(t,"/");
-       strcat(t,trans[j]);
-       barra[j] = t;
+
+    printf("ola\n");
+    while(read(waiting_room,&atual,sizeof(Conf)) > 0){
+        while(atual){
+            config->atual = atual->atual;
+            config = config->prox;
+            atual = atual->prox;
+        }
+        config = atual = aux;
+        
+        ola = config;
+        printf("----------------------------------------\n");
+
+        while(ola){
+            printf("%s | %d | %d\n",ola->transformacao,ola->max,ola->atual);
+            
+            ola = ola->prox;
+            fflush(stdout);   
+        }
     }
-    for(int i = 0; i < comandos; i++){
-       char* path = malloc(BUFFSIZE);
-       strcat(path,"Functions/");
-       strcat(path,trans[i]);
-       //printf("%s\n",path);
-       //printf("%s\n",barra[i]);
-       int ori;
-       int dest;
-       pid_t pid;
-       int status;
-       int save = dup(STDOUT_FILENO);
-       ori = open(files[0], O_RDONLY, 0600);
-       dest = open(files[1], O_CREAT | O_TRUNC | O_WRONLY, 0600);
-       if(i == 0 && comandos <= 1){
-          if(fork() == 0){
-               dup2(dest,1);
-               dup2(ori,0);
-               int ret = execlp(path,barra[i],files[0],files[1],NULL);
-               perror("error executing command");
-               _exit(ret);
-           } 
-       }
-       else if(i == 0 && comandos > 1){
-           pipe(p[i]);
-           if(pipe(p[i]) == -1){
-               perror("PIPE:");
-               return -1;
-           }
-           if(fork() == 0){
-               close(p[i][0]);
-               dup2(p[i][1],1);
-               dup2(ori,0);
-               //dup2(dest,1);
-               close(p[i][1]);
-               int ret = execlp(path,barra[i],files[0],files[1],NULL);
-               perror("error executing command");
-               _exit(ret);
-           }
-           else{
-               close(p[i][1]);
-           }
-       }
-       else if(i == (comandos-1)){
-           if(fork() == 0){
-               dup2(p[i-1][0],0);
-               dup2(dest,1);
-               close(p[i-1][0]);
-               int ret = execlp(path,barra[i],files[0],files[1],NULL);
-               perror("error executing command");
-               _exit(ret);
-           }
-           else{
-               close(p[i-1][0]);
-           }
-       }
-       else{
-           pipe(p[i]);
-           if(fork() == 0){
-               close(p[i][0]);
-               dup2(p[i-1][0],0);
-               close(p[i-1][0]);
-               dup2(p[i][1],1);
-               close(p[i][1]);
-               int ret = execlp(path,barra[i],files[0],files[1],NULL);
-               perror("error executing command");
-               _exit(ret);
-           }
-           else{
-               close(p[i-1][0]);
-               close(p[i][1]);
-           }
-       }
-    }
-    printf("Complete %s\n",trans[0]);
-    return 0;
+    
+        
+     
+    
+    return 1;
 }
 
 
 void closer(int signum){
     unlink("tmp/c2s_fifo");
+    unlink("tmp/waiting");
     exit(0);
 }
 
@@ -272,8 +353,8 @@ int main(int argc, char *argv[]) {
                     }
                     if(possivel(process.argc-4,transf,config)){
                         if(fork()==0){
-                            //if(!strcmp(transf[0],"encrypt")) sleep(7); Isto prova que está a correr de forma concorrente, como os miudos em columbine quando ouviram os tiros
-                            int x = pipe_Line(process.argc,files,transf);
+                            if(!strcmp(transf[0],"encrypt")) sleep(7); //Isto prova que está a correr de forma concorrente, como os miudos em columbine quando ouviram os tiros
+                            atualiza_Struct(process.argc, transf,files, config);
                         }
                     }
                     else{
