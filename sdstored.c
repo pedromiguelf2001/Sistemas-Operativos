@@ -90,8 +90,11 @@ Conf readConfig(char *config){
 }
 
 
-int possivel(Conf config,char *trans[]){
-    
+int possivel(Conf* config, Process * p){
+    for(int i = 0; i < p->argc; i++){
+
+    }
+    return 1;
 }
 
 int pipe_Line(int argc, char **files,char **trans){
