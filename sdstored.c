@@ -35,7 +35,16 @@ void reply(char* msg, int client, int end_flag){
     strcpy(reply.argv[0], msg);
     reply.argc = 1;
     reply.end_flag = end_flag;
-    
+    int s2c_fifo;
+    char s2c_fifo_name[256];
+    sprintf(s2c_fifo_name, "tmp/%d",client);
+    if((s2c_fifo = open(s2c_fifo_name, O_WRONLY)) == -1){
+        perror("Error replying to client");
+        _exit(0);
+    }
+    write(s2c_fifo,&reply,sizeof(Reply));
+    close(s2c_fifo);
+    if (end_flag) unlink(s2c_fifo_name);
 }
 
 
