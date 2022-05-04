@@ -146,7 +146,7 @@ int possivel_atual(int n, char * trans[], Conf config){
 
 
 
-int pipe_Line(int argc, char **files,char **trans, Conf config){
+int pipe_Line(int argc, char **files,char **trans, Conf config, int pid){
     int comandos = argc - 4;
     Conf temp = config;
     int n_pipes = comandos-1;
@@ -178,6 +178,9 @@ int pipe_Line(int argc, char **files,char **trans, Conf config){
             if(fork() == 0){
                dup2(dest,1);
                dup2(ori,0);
+               char msg[256];
+               sprintf(msg, "Processing: %s\n", trans[i]);
+               reply(msg,pid, 0);
                int ret = execlp(path,barra[i],files[0],files[1],NULL);
                perror("error executing command");
                _exit(ret);
@@ -279,7 +282,7 @@ int pipe_Line(int argc, char **files,char **trans, Conf config){
     printf("Complete %s\n",trans[0]);
     return 0;
 }
-int atualiza_Struct(int n, char *trans[],char **files, Conf config){
+int atualiza_Struct(int n, char *trans[],char **files, Conf config, int pid){
     printf("ene: %d\n",n);
     Conf temp = config;
     int flag;
@@ -317,7 +320,7 @@ int atualiza_Struct(int n, char *trans[],char **files, Conf config){
     int waiting_room = open("tmp/waiting", O_RDONLY | O_NONBLOCK, 0666);  
     if(possivel_atual(n-4, trans,config)){
         printf("N:%d\n",n-4);
-        pipe_Line(n,files,trans,config);
+        pipe_Line(n,files,trans,config,pid);
     }
 
     
@@ -394,7 +397,7 @@ int main(int argc, char *argv[]) {
                         if(fork()==0){
                             //if(!strcmp(transf[0],"encrypt")) sleep(7); //Isto prova que está a correr de forma concorrente, como os miudos em columbine quando ouviram os tiros
                             
-                            atualiza_Struct(process.argc-4, transf,files, config);
+                            atualiza_Struct(process.argc-4, transf,files, config,process.pid);
                             reply(
                                 "The files have been processed successfully!\n"
                                 , process.pid, 1);
