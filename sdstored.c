@@ -116,10 +116,10 @@ int possivel_atual(int n, char * trans[], Conf config){
                 count++;
                 }   
             }
-            printf("%d\n",count);
         temp = config; 
         while(temp){
         if(!strcmp(trans[i],temp->transformacao)){
+            printf("%s: count:%d | %d\n",trans[i],count,temp->atual);
             if(count > temp->atual) return 0;
             }
             temp = temp->prox;
@@ -139,8 +139,6 @@ int possivel_atual(int n, char * trans[], Conf config){
 
 int pipe_Line(int argc, char **files,char **trans, Conf config){
     int comandos = argc - 4;
-    printf("%d\n",comandos);
-    fflush(stdout);
     Conf temp = config;
     int n_pipes = comandos-1;
     int p[n_pipes][2];
@@ -164,6 +162,7 @@ int pipe_Line(int argc, char **files,char **trans, Conf config){
        ori = open(files[0], O_RDONLY, 0600);
        dest = open(files[1], O_CREAT | O_TRUNC | O_WRONLY, 0600);
        if (!strcmp(trans[0], "nop") && comandos == 3){
+           printf("he sleepin good\n");
            sleep(10);
        }
         if(i == 0 && comandos <= 1){
@@ -272,27 +271,28 @@ int pipe_Line(int argc, char **files,char **trans, Conf config){
     return 0;
 }
 int atualiza_Struct(int n, char *trans[],char **files, Conf config){
-  
-
+    printf("ene: %d\n",n);
     Conf temp = config;
     int flag;
     for(int i = 0; i < n; i++){
-        flag = 1;
-        while(flag && temp){
+        printf("i:%d , %s\n",i,trans[i]);
+        while(temp){
             if(!strcmp(temp->transformacao,trans[i])){
                 if(temp->atual > 0){
                     temp->atual = temp->atual - 1;
+                    printf("Temp:%s\n",temp->transformacao);
+                    break;
                 }
                 else{
                     return 0;
                 }
-                flag = 0;
             }
             temp = temp->prox;
         }
+        temp = config;
     }
     Conf ola = config;
-    printf("----------------------------------------\n");
+    printf("-----------------Atual-----------------------\n");
 
         while(ola){
             printf("%s | %d | %d\n",ola->transformacao,ola->max,ola->atual);
@@ -307,6 +307,7 @@ int atualiza_Struct(int n, char *trans[],char **files, Conf config){
     aux = atual = config;
     int waiting_room = open("tmp/waiting", O_RDONLY | O_NONBLOCK, 0666);  
     if(possivel_atual(n-4, trans,config)){
+        printf("N:%d\n",n-4);
         pipe_Line(n,files,trans,config);
     }
 
@@ -382,9 +383,9 @@ int main(int argc, char *argv[]) {
                     }
                     if(possivel(process.argc-4,transf,config)){
                         if(fork()==0){
-                            if(!strcmp(transf[0],"encrypt")) sleep(7); //Isto prova que está a correr de forma concorrente, como os miudos em columbine quando ouviram os tiros
+                            //if(!strcmp(transf[0],"encrypt")) sleep(7); //Isto prova que está a correr de forma concorrente, como os miudos em columbine quando ouviram os tiros
                             
-                            atualiza_Struct(process.argc, transf,files, config);
+                            atualiza_Struct(process.argc-4, transf,files, config);
                         }
                     }
                     else{
