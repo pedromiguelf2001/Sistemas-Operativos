@@ -395,6 +395,9 @@ int main(int argc, char *argv[]) {
                             //if(!strcmp(transf[0],"encrypt")) sleep(7); //Isto prova que está a correr de forma concorrente, como os miudos em columbine quando ouviram os tiros
                             
                             atualiza_Struct(process.argc-4, transf,files, config);
+                            reply(
+                                "The files have been processed successfully!\n"
+                                , process.pid, 1);
                         }
                     }
                     else{

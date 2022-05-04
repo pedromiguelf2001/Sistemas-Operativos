@@ -35,9 +35,11 @@ void reply(){
             }
             if (reply.end_flag){
                 close(s2c_fifo);
-                exit(0);
+                _exit(0);
+                break;
             }
         }
+        break;
     }
 }
 /*
