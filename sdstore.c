@@ -27,19 +27,42 @@ void copy_argv(Process *p, int argc, char** argv){
 */
 void reply(){
     Reply reply;
+    char * curr = malloc(1024);
+    
     int s2c_fifo = open(s2c_fifo_name, O_RDONLY);
+    
     while(1){
-        while (read(s2c_fifo, &reply, sizeof(Reply))>=1){
+        
+        while (read(s2c_fifo, &reply, sizeof(Reply))>0){
+            
             for(int i = 0; i < reply.argc; i++){
                 write(1,reply.argv[i],strlen(reply.argv[i]));
+                curr = strcpy(curr,reply.argv[0]);
+                
+                curr = strtok(curr," ");
+                
+            
             }
-            if (reply.end_flag){
+            
+            
+            // if(reply.end_flag==1) printf("Wicked\n");
+            if (!strcmp("The files have been processed successfully!\n", reply.argv[0])){
+                
                 close(s2c_fifo);
+                unlink(s2c_fifo_name);
                 _exit(0);
-                break;
+                
             }
+            if(!strcmp(curr,"Current")){
+                
+                unlink(s2c_fifo_name);
+                _exit(0);
+            }
+            
+            
+          
         }
-        break;
+        
     }
 }
 /*
@@ -64,6 +87,8 @@ void closer(int signum){
 int main(int argc, char** argv){
     signal(SIGINT, closer);
     signal(SIGTERM, closer);
+    signal(SIGSEGV,closer);
+    signal(SIGQUIT,closer);
     fflush(stdout);
     sprintf(s2c_fifo_name, "tmp/%d",(int)getpid());
 
@@ -100,9 +125,11 @@ int main(int argc, char** argv){
                 (!strcmp(argv[1], "status")     && argc == 2)
             ){
         int c2s_fifo = open("tmp/c2s_fifo", O_WRONLY);
+        
         proc_file(c2s_fifo, argc, argv);
         close(c2s_fifo);
         reply();
+        
     }
     // Comandos inexistentes
     else{

@@ -35,15 +35,17 @@ void reply(char* msg, int client, int end_flag){
     strcpy(reply.argv[0], msg);
     reply.argc = 1;
     reply.end_flag = end_flag;
+    
     int s2c_fifo;
     char path[256];
     sprintf(path, "tmp/%d",client);
     if((s2c_fifo = open(path, O_WRONLY)) == -1){
         perror("Error replying to client");
         _exit(0);
-    }
+    } 
     write(s2c_fifo,&reply,sizeof(Reply));
     close(s2c_fifo);
+
     if (end_flag) unlink(path);
 }
 
@@ -146,59 +148,60 @@ int possivel_atual(int n, char * trans[], Conf config){
 
 
 
-int pipe_Line(int argc, char **files,char **trans, Conf config, int pid){
+int pipe_Line(int argc, char **files,char *trans[], Conf config, int pid){
     int comandos = argc - 4;
     Conf temp = config;
     int n_pipes = comandos-1;
     int p[n_pipes][2];
     char* barra[comandos];
+    printf("T: %s\n",trans[0]);
+    
     for(int j = 0; j < comandos; j++){
        char* t = malloc(BUFFSIZE);
        strcat(t,"/");
+       // printf("%s\n",trans[j]);
        strcat(t,trans[j]);
        barra[j] = t;
     }
     int waiting_room = open("tmp/waiting", O_WRONLY,0666);
     for(int i = 0; i < comandos; i++){
-       char* path = malloc(BUFFSIZE);
-       strcat(path,"Functions/");
-       strcat(path,trans[i]);
-       int ori;
-       int dest;
-       pid_t pid;
-       int status;
-       int save = dup(STDOUT_FILENO);
-       ori = open(files[0], O_RDONLY, 0600);
-       dest = open(files[1], O_CREAT | O_TRUNC | O_WRONLY, 0600);
-       if (!strcmp(trans[0], "nop") && comandos == 3){
-           printf("he sleepin good\n");
-           sleep(10);
-       }
+        char* path = malloc(BUFFSIZE);
+        strcat(path,"Functions/");
+        strcat(path,trans[i]);
+        int ori;
+        int dest;
+        pid_t pid;
+        int status;
+        int save = dup(STDOUT_FILENO);
+        ori = open(files[0], O_RDONLY, 0600);
+        dest = open(files[1], O_CREAT | O_TRUNC | O_WRONLY, 0600);
+        if (!strcmp(trans[0], "nop") && comandos == 3){
+            printf("he sleepin good\n");
+            sleep(10);
+        }
         if(i == 0 && comandos <= 1){
             if(fork() == 0){
-               dup2(dest,1);
-               dup2(ori,0);
-               char msg[256];
-               sprintf(msg, "Processing: %s\n", trans[i]);
-               reply(msg,pid, 0);
-               int ret = execlp(path,barra[i],files[0],files[1],NULL);
-               perror("error executing command");
-               _exit(ret);
+                dup2(dest,1);
+                dup2(ori,0);
+                int ret = execlp(path,barra[i],files[0],files[1],NULL);
+                perror("error executing command");
+                _exit(ret);
             }
             else{
                 wait(NULL);
                 while (temp){
-                    
-                    if(!strcmp(trans[i], temp->transformacao)){
-                        temp->atual = temp->atual + 1;
-                        
-                        break;
-                    }
-                    temp = temp->prox;
+
+                if(!strcmp(trans[i], temp->transformacao)){
+                temp->atual = temp->atual + 1;
+
+
+                break;
+                }
+                temp = temp->prox;
                 }
                 write(waiting_room, &config,sizeof(Conf) );
             } 
-       }
+        }
         else if(i == 0 && comandos > 1){
            pipe(p[i]);
            if(pipe(p[i]) == -1){
@@ -223,13 +226,14 @@ int pipe_Line(int argc, char **files,char **trans, Conf config, int pid){
                 while (temp){
                    if(!strcmp(trans[i], temp->transformacao)){
                         temp->atual = temp->atual + 1;
+
                         break;
                    }
                    temp = temp->prox;
                 }
                     Conf ola = config;
            }
-       }
+        }
         else if(i == (comandos-1)){
             if(fork() == 0){
                dup2(p[i-1][0],0);
@@ -251,32 +255,32 @@ int pipe_Line(int argc, char **files,char **trans, Conf config, int pid){
                 }
                 write(waiting_room, &config,sizeof(Conf) );
             }
-       }
-       else{
-           pipe(p[i]);
-           if(fork() == 0){
-               close(p[i][0]);
-               dup2(p[i-1][0],0);
-               close(p[i-1][0]);
-               dup2(p[i][1],1);
-               close(p[i][1]);
-               int ret = execlp(path,barra[i],files[0],files[1],NULL);
-               perror("error executing command");
-               _exit(ret);
-           }
-           else{
+        }
+        else{
+            pipe(p[i]);
+            if(fork() == 0){
+                close(p[i][0]);
+                dup2(p[i-1][0],0);
+                close(p[i-1][0]);
+                dup2(p[i][1],1);
+                close(p[i][1]);
+                int ret = execlp(path,barra[i],files[0],files[1],NULL);
+                perror("error executing command");
+                _exit(ret);
+            }
+            else{
                 close(p[i-1][0]);
                 close(p[i][1]);
                 temp = config;
                 while (temp){
-                   if(!strcmp(trans[i], temp->transformacao)){
+                    if(!strcmp(trans[i], temp->transformacao)){
                         temp->atual = temp->atual + 1;
                         break;
-                   }
-                   temp = temp->prox;
+                    }
+                    temp = temp->prox;
                 }
                 write(waiting_room, &config,sizeof(Conf) );
-           }
+            }
        }
     }
     printf("Complete %s\n",trans[0]);
@@ -286,13 +290,14 @@ int atualiza_Struct(int n, char *trans[],char **files, Conf config, int pid){
     printf("ene: %d\n",n);
     Conf temp = config;
     int flag;
+    
     for(int i = 0; i < n; i++){
         printf("i:%d , %s\n",i,trans[i]);
         while(temp){
             if(!strcmp(temp->transformacao,trans[i])){
                 if(temp->atual > 0){
                     temp->atual = temp->atual - 1;
-                    printf("Temp:%s\n",temp->transformacao);
+                    
                     break;
                 }
                 else{
@@ -318,8 +323,8 @@ int atualiza_Struct(int n, char *trans[],char **files, Conf config, int pid){
     Conf aux;
     aux = atual = config;
     int waiting_room = open("tmp/waiting", O_RDONLY | O_NONBLOCK, 0666);  
-    if(possivel_atual(n-4, trans,config)){
-        printf("N:%d\n",n-4);
+    if(possivel_atual(n, trans,config)){
+        printf("N:%d\n",n);
         pipe_Line(n,files,trans,config,pid);
     }
 
@@ -357,6 +362,25 @@ void closer(int signum){
 }
 
 
+void send_status(Conf config,int pid){
+    char * msg = malloc(2048);
+    char * line = malloc(64);
+    
+    strcat(msg, "Current server configuration: (name | maximum processes | available processes)\n");
+    Conf temp = config;
+    while (temp){
+        sprintf(line,"%s | %d | %d\n",temp->transformacao,temp->max,temp->atual);
+        strcat(msg,line);
+            
+        temp = temp->prox;
+        
+    }
+    strcat(msg,"Warning: This is a snapshot of a specific time frame, it may not reflect the present status\n");
+    reply(msg, pid, 0);
+
+}
+
+
 
 
 int main(int argc, char *argv[]) {
@@ -382,7 +406,11 @@ int main(int argc, char *argv[]) {
         // Abre o pipe Client to server
         int c2s_fifo = open("tmp/c2s_fifo", O_RDONLY,0666);
         while(read(c2s_fifo,&process, sizeof(Process)) > 0){
+            // printf("%d\n",process.argc);
+            // printf("%s\n",process.argv[1]);
+            // if(process.argc == 2 && strcmp(argv[1],"status") == 0) printf("Isto ta a tripar");
             if(process.argc >= 5 && !strcmp(process.argv[1],"proc-file")){
+                reply("please wait\n", process.pid, 0);
                 if(fork()==0){
                     for(int i = 0; i < 2; i++){
                     files[i] = malloc(BUFFSIZE);
@@ -409,8 +437,12 @@ int main(int argc, char *argv[]) {
                     }
                 }
             }
-            else if(process.argc == 2 && !strcmp(argv[1],"status")){
-
+            else if(process.argc == 2 && !strcmp(process.argv[1],"status")){
+                if(fork() == 0){
+                    send_status(config, process.pid);
+                }
+                    
+                
             }
         }
         close(c2s_fifo);
