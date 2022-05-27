@@ -307,9 +307,20 @@ void send_status(Conf config,int pid){
     reply(msg, pid, 0);
 
 }
-void enqueue(Process pro){
+void enqueue(Process *pro){
+    printf("ENQUEUE\n");
+    Process aux;
+    //aux = malloc(sizeof(struct process));
+    aux.argc = pro -> argc;
+    aux.pid = pro->pid;
+    for(int i =  0; i < aux.argc; i++){
+        strcpy(aux.argv[i],pro->argv[i]);
+    }
+    
+
     if(!queue){
-        queue->p = pro;
+        queue->p = aux;
+        printf("PASSou \n");
         queue->prox = NULL;
     }
     else{
@@ -317,7 +328,7 @@ void enqueue(Process pro){
         while(temp->prox){
             temp = temp->prox;
         }
-        temp->prox->p = pro;
+        temp->prox->p = aux;
         temp->prox->prox = NULL;
     }
 }
@@ -428,6 +439,8 @@ int main(int argc, char *argv[]) {
         _exit(-1);
     }
     Process process;
+    queue = malloc(sizeof(struct processos));
+    //queue = NULL;
     while(1){
         // Abre o pipe Client to server
         int c2s_fifo = open("tmp/c2s_fifo", O_RDONLY,0666);
@@ -451,7 +464,7 @@ int main(int argc, char *argv[]) {
                 if(possivel(process.argc-4,transf,global)){
                     // printf("!!!!!%s | %d\n",transf[0],process.argc-4);
 
-                    try:
+                    
 
                     if(possivel_atual(process.argc-4, transf,global)){
 
@@ -486,10 +499,7 @@ int main(int argc, char *argv[]) {
 
                 } 
                 else{
-                    if(fork()==0){
-                        goto try;
-                    }
-                    
+                    enqueue(&process);
                 }
 
                 
