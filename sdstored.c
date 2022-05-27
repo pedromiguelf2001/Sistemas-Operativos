@@ -17,7 +17,23 @@ typedef struct lligada {
     struct lligada *prox;
 } *Conf;
 
+typedef struct pedido{
+    int tamanho;
+    char *transf[20];
+    pid_t pid;
+    struct pedido *prox;
+} *Pedido;
+
+
+typedef struct processos {
+    Process p;
+    struct processos *prox;
+} *Processos;
+
 int server_pid;
+Conf global;
+Pedido pedidos = NULL;
+Processos queue = NULL;
 
 ssize_t readln(int fd, char *line, size_t size) {
 	ssize_t res = 0;
@@ -117,7 +133,6 @@ int possivel(int n, char *trans[], Conf config){
 }
 
 int possivel_atual(int n, char * trans[], Conf config){
-    printf("%d\n",n);
     int count;
     Conf temp = config;
     for(int i = 0; i < n; i++){
@@ -130,7 +145,6 @@ int possivel_atual(int n, char * trans[], Conf config){
         temp = config; 
         while(temp){
         if(!strcmp(trans[i],temp->transformacao)){
-            printf("%s: count:%d | %d\n",trans[i],count,temp->atual);
             if(count > temp->atual) return 0;
             }
             temp = temp->prox;
@@ -150,16 +164,14 @@ int possivel_atual(int n, char * trans[], Conf config){
 
 int pipe_Line(int argc, char **files,char *trans[], Conf config, int pid){
     int comandos = argc - 4;
+    printf("Numero de Comandos %d\n",comandos);
     Conf temp = config;
     int n_pipes = comandos-1;
     int p[n_pipes][2];
     char* barra[comandos];
-    printf("T: %d\n",comandos);
-    
     for(int j = 0; j < comandos; j++){
        char* t = malloc(BUFFSIZE);
        strcat(t,"/");
-       // printf("%s\n",trans[j]);
        strcat(t,trans[j]);
        barra[j] = t;
     }
@@ -167,7 +179,6 @@ int pipe_Line(int argc, char **files,char *trans[], Conf config, int pid){
         printf(("Juro que nao meti nada na bebida\n"));
         sleep(10);
     }
-    int waiting_room = open("tmp/waiting", O_WRONLY,0666);
     for(int i = 0; i < comandos; i++){
         char* path = malloc(BUFFSIZE);
         strcat(path,"Functions/");
@@ -186,20 +197,6 @@ int pipe_Line(int argc, char **files,char *trans[], Conf config, int pid){
                 int ret = execlp(path,barra[i],files[0],files[1],NULL);
                 perror("error executing command");
                 _exit(ret);
-            }
-            else{
-                wait(NULL);
-                while (temp){
-
-                if(!strcmp(trans[i], temp->transformacao)){
-                temp->atual = temp->atual + 1;
-
-
-                break;
-                }
-                temp = temp->prox;
-                }
-                write(waiting_room, &config,sizeof(Conf) );
             } 
         }
         else if(i == 0 && comandos > 1){
@@ -209,7 +206,6 @@ int pipe_Line(int argc, char **files,char *trans[], Conf config, int pid){
                return -1;
            }
            if(fork() == 0){
-               
                close(p[i][0]);
                dup2(p[i][1],1);
                dup2(ori,0);
@@ -219,20 +215,8 @@ int pipe_Line(int argc, char **files,char *trans[], Conf config, int pid){
                _exit(ret);
            }
            else{
-                wait(NULL);
                 close(p[i][1]);
-                
-                temp = config;
-                while (temp){
-                   if(!strcmp(trans[i], temp->transformacao)){
-                        temp->atual = temp->atual + 1;
-
-                        break;
-                   }
-                   temp = temp->prox;
-                }
-                    Conf ola = config;
-           }
+            }
         }
         else if(i == (comandos-1)){
             if(fork() == 0){
@@ -245,15 +229,6 @@ int pipe_Line(int argc, char **files,char *trans[], Conf config, int pid){
             }
             else{
                 close(p[i-1][0]);
-                temp = config;
-                while (temp){
-                   if(!strcmp(trans[i], temp->transformacao)){
-                        temp->atual = temp->atual + 1;
-                        break;
-                   }
-                   temp = temp->prox;
-                }
-                write(waiting_room, &config,sizeof(Conf) );
             }
         }
         else{
@@ -271,33 +246,20 @@ int pipe_Line(int argc, char **files,char *trans[], Conf config, int pid){
             else{
                 close(p[i-1][0]);
                 close(p[i][1]);
-                temp = config;
-                while (temp){
-                    if(!strcmp(trans[i], temp->transformacao)){
-                        temp->atual = temp->atual + 1;
-                        break;
-                    }
-                    temp = temp->prox;
-                }
-                write(waiting_room, &config,sizeof(Conf) );
             }
        }
     }
-    printf("Complete %s\n",trans[0]);
+    printf("Complete %s, com %d comandos\n",trans[0],comandos);
     return 0;
 }
+
 int atualiza_Struct(int n, char *trans[],char **files, Conf config, int pid){
-    printf("ene: %d\n",n);
-    Conf temp = config;
-    int flag;
-    
+    Conf temp = config;    
     for(int i = 0; i < n; i++){
-        printf("i:%d , %s\n",i,trans[i]);
         while(temp){
             if(!strcmp(temp->transformacao,trans[i])){
                 if(temp->atual > 0){
                     temp->atual = temp->atual - 1;
-                    
                     break;
                 }
                 else{
@@ -317,39 +279,6 @@ int atualiza_Struct(int n, char *trans[],char **files, Conf config, int pid){
             ola = ola->prox;
             fflush(stdout);   
         }
-  
-    
-    Conf atual;
-    Conf aux;
-    aux = atual = config;
-    int waiting_room = open("tmp/waiting", O_RDONLY | O_NONBLOCK, 0666);  
-    
-       // pipe_Line(n+4,files,trans,config,pid);
-
-
-    
-    while(read(waiting_room,&atual,sizeof(Conf)) > 0){
-        while(atual){
-            config->atual = atual->atual;
-            config = config->prox;
-            atual = atual->prox;
-        }
-        config = atual = aux;
-        
-        ola = config;
-        printf("----------------------------------------\n");
-
-        while(ola){
-            printf("%s | %d | %d\n",ola->transformacao,ola->max,ola->atual);
-            
-            ola = ola->prox;
-            fflush(stdout);   
-        }
-    }
-    
-        
-     
-    
     return 1;
 }
 
@@ -378,80 +307,118 @@ void send_status(Conf config,int pid){
     reply(msg, pid, 0);
 
 }
+void enqueue(Process pro){
+    if(!queue){
+        queue->p = pro;
+        queue->prox = NULL;
+    }
+    else{
+        Processos temp = queue;
+        while(temp->prox){
+            temp = temp->prox;
+        }
+        temp->prox->p = pro;
+        temp->prox->prox = NULL;
+    }
+}
+void dequeue(){
+    if(queue){
+        int tryagain = open("tmp/c2s_fifo",O_WRONLY);
+        write(tryagain,&queue->p,sizeof(Process));
+        queue = queue->prox;
+    }
+}
 
-int repor_Struct(int n, char *trans[],char **files, Conf config, int pid){
-    Conf temp = config;
-    int flag;
-    
-    for(int i = 0; i < n; i++){
-        printf("i:%d , %s\n",i,trans[i]);
-        while(temp){
-            if(!strcmp(temp->transformacao,trans[i])){
-                if(temp->atual >= 0){
-                    temp->atual = temp->atual + 1;
+
+
+void handler(int signum){
+    Pedido ola = pedidos;
+    Conf l = global;
+    pid_t pid;
+    int status;
+    pid = waitpid(-1, &status, WNOHANG);
+    printf("Pid handler %d\n",pid);
+    fflush(stdout);
+    Pedido temp = pedidos;
+    Pedido aux = temp;
+    int flag = 0;
+    while(temp){
+        if(temp->pid == pid){
+            printf("IGUAL\n");
+            flag = 1;
+            aux = temp;
+        }
+        temp = temp->prox;
+    }
+    if(flag){
+    for(int i = 0; i < aux->tamanho; i++){
+        while(l){
+            if(!strcmp(l->transformacao,aux->transf[i])){
+                if(l->atual >= 0){
+                    l->atual = l->atual + 1;
                     
                     break;
                 }
                 else{
-                    return 0;
+                    return;
                 }
             }
-            temp = temp->prox;
+            l = l->prox;
         }
-        temp = config;
+        l = global;
     }
-    Conf ola = config;
+    Conf o = global;
     printf("-----------------Depois-----------------------\n");
 
-        while(ola){
-            printf("%s | %d | %d\n",ola->transformacao,ola->max,ola->atual);
+        while(o){
+            printf("%s | %d | %d\n",o->transformacao,o->max,o->atual);
             
-            ola = ola->prox;
+            o = o->prox;
             fflush(stdout);   
         }
-  
-    
-    Conf atual;
-    Conf aux;
-    aux = atual = config;
-    int waiting_room = open("tmp/waiting", O_RDONLY | O_NONBLOCK, 0666);  
-    
-       // pipe_Line(n+4,files,trans,config,pid);
-
-
-    
-    while(read(waiting_room,&atual,sizeof(Conf)) > 0){
-        while(atual){
-            config->atual = atual->atual;
-            config = config->prox;
-            atual = atual->prox;
-        }
-        config = atual = aux;
-        
-        ola = config;
-        printf("----------------------------------------\n");
-
-        while(ola){
-            printf("%s | %d | %d\n",ola->transformacao,ola->max,ola->atual);
-            
-            ola = ola->prox;
-            fflush(stdout);   
-        }
+        dequeue();
     }
-} 
+    
+}
+
+
+void addPedido(int n,char *t[], pid_t pide){
+    Pedido novo;
+    novo = malloc(sizeof(struct pedido));
+    novo->tamanho = n;
+    novo->pid = pide;
+    novo->prox = NULL;
+    for(int i = 0; i < n; i++){
+        novo->transf[i] = malloc(BUFFSIZE);
+        strcpy(novo->transf[i],t[i]);
+    }
+    Pedido temp = pedidos;
+    if(!temp){
+        pedidos = novo;
+    }
+    else{
+        while(temp->prox){
+        temp = temp->prox;
+        }
+        temp->prox = novo;
+    }
+}
+
+
+
 
 
 int main(int argc, char *argv[]) {
     char *files[2];
     int fd[2];
+    int status;
     server_pid = getpid();
     printf("%d\n", server_pid);
-
-    
+    signal(SIGCHLD,handler);
     signal(SIGINT, closer);
     signal(SIGTERM, closer);
-
-    Conf config = readConfig(argv[1]);
+    //signal(SIGSEGV, closer);
+    global = readConfig(argv[1]);
     if (mkfifo("tmp/c2s_fifo", 0666) == -1){
         perror("Estourou!\n");
         _exit(-1);
@@ -465,51 +432,76 @@ int main(int argc, char *argv[]) {
         // Abre o pipe Client to server
         int c2s_fifo = open("tmp/c2s_fifo", O_RDONLY,0666);
         while(read(c2s_fifo,&process, sizeof(Process)) > 0){
-                printf("Tou");
-                if(fork()==0){
-                    if(process.argc == 2 && !strcmp(process.argv[1],"status")){
-                        if(fork() == 0){                
-                            send_status(config, process.pid);
-                        }
+            if(process.argc == 2 && !strcmp(process.argv[1],"status")){         
+                send_status(global, process.pid);
+            }
+            if(process.argc >= 5 && !strcmp(process.argv[1],"proc-file")){
+                reply("please wait\n", process.pid, 0);
+                for(int i = 0; i < 2; i++){
+                    files[i] = malloc(BUFFSIZE);
+                    strcpy(files[i],process.argv[i+2]);
+                }
+                char *transf[process.argc-4];
+                for(int i = 0; i < process.argc-4; i++){
+                    transf[i] = malloc(BUFFSIZE);
+                    strcpy(transf[i],process.argv[i+4]);
+                }
+                pipe(fd);
+                
+                if(possivel(process.argc-4,transf,global)){
+                    // printf("!!!!!%s | %d\n",transf[0],process.argc-4);
+
+                    try:
+
+                    if(possivel_atual(process.argc-4, transf,global)){
+
+
+
+
+                        atualiza_Struct(process.argc-4, transf,files, global,process.pid);
+                        if(fork() == 0){
+                            pid_t pide = getpid();
+                            printf("Pid FORk %d\n",pide);
+                            fflush(stdout);
+                            char pi[BUFFSIZE];
+                            sprintf(pi,"%d",pide);
+                            close(fd[0]);
+                            write(fd[1],&pi,sizeof(pi));
+                            close(fd[1]);
+                            pipe_Line(process.argc,files,transf,global,process.pid);
+                            reply(
+                            "The files have been processed successfully!\n"
+                            , process.pid, 1);
+                            _exit(0);
                     }
+
+                    close(fd[1]);
+                    char buff[BUFFSIZE];
+                    int aux = 0;
+                    while(read(fd[0],&buff,BUFFSIZE)>0){
+                        aux = atoi(buff);
+                    }
+                    close(fd[0]);
+                    addPedido(process.argc-4, transf, aux);
+
+                } 
+                else{
+                    if(fork()==0){
+                        goto try;
+                    }
+                    
                 }
-                 if(process.argc >= 5 && !strcmp(process.argv[1],"proc-file")){
-                    reply("please wait\n", process.pid, 0);
-                    //if(fork()==0){
-                        for(int i = 0; i < 2; i++){
-                        files[i] = malloc(BUFFSIZE);
-                        strcpy(files[i],process.argv[i+2]);
-                        }
-                        char *transf[process.argc-4];
-                        for(int i = 0; i < process.argc-4; i++){
-                            transf[i] = malloc(BUFFSIZE);
-                            strcpy(transf[i],process.argv[i+4]);
-                        }
-                        if(possivel(process.argc-4,transf,config)){
-                            if(possivel_atual(process.argc-4, transf,config)){
-                                atualiza_Struct(process.argc-4, transf,files, config,process.pid);
-                                if(fork()==0){
-                                    printf("Entrou\n");
-                                     pipe_Line(process.argc,files,transf,config,process.pid);
-                                    //atualiza_Struct(process.argc-4, transf,files, config,process.pid);
-                                    reply(
-                                    "The files have been processed successfully!\n"
-                                    , process.pid, 1);
-                                }
-                                else{
-                                    wait(NULL);
-                                    repor_Struct(process.argc-4, transf,files, config,process.pid);
-                                }
-                            }
-                        }
-                        else{
-                            write(1,"Wrong number of transformations",strlen("Wrong number of transformations"));
-                            return -1;
-                        }
+
+                
+            
+            }
+            else{
+                    write(1,"Wrong number of transformations",strlen("Wrong number of transformations"));
+                    return -1;
                 }
+            }
         }
         close(c2s_fifo);
     }
     return 0;
-    
 }
