@@ -107,6 +107,8 @@ int main(int argc, char** argv){
     //signal(SIGSEGV,closer);
     signal(SIGQUIT,closer);
     fflush(stdout);
+
+    
     sprintf(s2c_fifo_name, "tmp/%d",(int)getpid());
 
     // Abrimos o pipe server to client

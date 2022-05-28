@@ -300,7 +300,7 @@ void send_status(Conf config,int pid){
     strcat(msg, "Current server configuration: (name | maximum processes | available processes)\n");
     Conf temp = config;
     while (temp){
-        sprintf(line,"%s | %d | %d\n",temp->transformacao,temp->max,temp->atual);
+        sprintf(line," transf %s | %d/%d (running/max)\n",temp->transformacao,temp->max - temp->atual,temp->max);
         strcat(msg,line);
             
         temp = temp->prox;
