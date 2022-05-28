@@ -34,7 +34,6 @@ void reply(){
     while(1){
         
         while (read(s2c_fifo, &reply, sizeof(Reply))>0){
-            
             for(int i = 0; i < reply.argc; i++){
                 write(1,reply.argv[i],strlen(reply.argv[i]));
                 curr = strcpy(curr,reply.argv[0]);
@@ -54,7 +53,7 @@ void reply(){
                 
             }
             if(!strcmp(curr,"Current")){
-                
+
                 unlink(s2c_fifo_name);
                 _exit(0);
             }

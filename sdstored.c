@@ -33,7 +33,10 @@ typedef struct processos {
 int server_pid;
 Conf global;
 Pedido pedidos = NULL;
-Processos queue = NULL;
+Process queue[2048];
+int iq = 0;
+int fq = 0;
+
 
 ssize_t readln(int fd, char *line, size_t size) {
 	ssize_t res = 0;
@@ -308,36 +311,24 @@ void send_status(Conf config,int pid){
 
 }
 void enqueue(Process *pro){
-    printf("ENQUEUE\n");
-    Process aux;
-    //aux = malloc(sizeof(struct process));
-    aux.argc = pro -> argc;
-    aux.pid = pro->pid;
-    for(int i =  0; i < aux.argc; i++){
-        strcpy(aux.argv[i],pro->argv[i]);
+    queue[fq].pid = pro->pid;
+    //printf("pid: %d\n",queue[fq].pid);
+    queue[fq].argc = pro -> argc;
+    for(int i = 0; i < queue[fq].argc; i++){
+        strcpy(queue[fq].argv[i],pro->argv[i]);
     }
-    
-
-    if(!queue){
-        queue->p = aux;
-        printf("PASSou \n");
-        queue->prox = NULL;
-    }
-    else{
-        Processos temp = queue;
-        while(temp->prox){
-            temp = temp->prox;
-        }
-        temp->prox->p = aux;
-        temp->prox->prox = NULL;
-    }
+    fq++;
+    printf("Fim enqueue, fq : %d\n",fq);
 }
 void dequeue(){
-    if(queue){
-        int tryagain = open("tmp/c2s_fifo",O_WRONLY);
-        write(tryagain,&queue->p,sizeof(Process));
-        queue = queue->prox;
+    if(iq < fq){
+            printf("Dequeue\n");
+        int try_again = open("tmp/c2s_fifo",O_WRONLY);
+        write(try_again,&queue[iq],sizeof(Process));
+        close(try_again);
+        iq++;
     }
+    printf("Fim Dequeue\n");
 }
 
 
@@ -439,12 +430,13 @@ int main(int argc, char *argv[]) {
         _exit(-1);
     }
     Process process;
-    queue = malloc(sizeof(struct processos));
-    //queue = NULL;
     while(1){
         // Abre o pipe Client to server
         int c2s_fifo = open("tmp/c2s_fifo", O_RDONLY,0666);
         while(read(c2s_fifo,&process, sizeof(Process)) > 0){
+            
+            printf("Entrou\n");
+
             if(process.argc == 2 && !strcmp(process.argv[1],"status")){         
                 send_status(global, process.pid);
             }
@@ -462,7 +454,6 @@ int main(int argc, char *argv[]) {
                 pipe(fd);
                 
                 if(possivel(process.argc-4,transf,global)){
-                    // printf("!!!!!%s | %d\n",transf[0],process.argc-4);
 
                     
 
