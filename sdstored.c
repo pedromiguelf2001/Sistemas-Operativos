@@ -22,6 +22,7 @@ typedef struct pedido{
     char *transf[20];
     pid_t pid;
     struct pedido *prox;
+    char info[1024];
 } *Pedido;
 
 int server_pid;
@@ -149,7 +150,7 @@ int possivel_atual(int n, char * trans[], Conf config){
 
 
 
-int pipe_Line(int argc, char **files,char *trans[], Conf config, int pid){
+int pipe_Line(int argc, char **files,char *trans[], Conf config, int pid, char* caminho){
     int comandos = argc - 4;
     Conf temp = config;
     int n_pipes = comandos-1;
@@ -175,7 +176,7 @@ int pipe_Line(int argc, char **files,char *trans[], Conf config, int pid){
 
     for(int i = 0; i < comandos; i++){
         char* path = malloc(BUFFSIZE);
-        strcat(path,"Functions/");
+        strcpy(path,caminho);
         strcat(path,trans[i]);
         int ori;
         int dest;
@@ -188,7 +189,7 @@ int pipe_Line(int argc, char **files,char *trans[], Conf config, int pid){
             if(fork() == 0){
                 dup2(dest,1);
                 dup2(ori,0);
-                int ret = execlp(path,barra[i],files[0],files[1],NULL);
+                int ret = execl(path,barra[i],files[0],files[1],NULL);
                 perror("error executing command");
                 _exit(ret);
             } 
@@ -204,7 +205,7 @@ int pipe_Line(int argc, char **files,char *trans[], Conf config, int pid){
                dup2(p[i][1],1);
                dup2(ori,0);
                close(p[i][1]);
-               int ret = execlp(path,barra[i],files[0],files[1],NULL);
+               int ret = execl(path,barra[i],files[0],files[1],NULL);
                perror("error executing command");
                _exit(ret);
            }
@@ -217,7 +218,7 @@ int pipe_Line(int argc, char **files,char *trans[], Conf config, int pid){
                dup2(p[i-1][0],0);
                dup2(dest,1);
                close(p[i-1][0]);
-               int ret = execlp(path,barra[i],files[0],files[1],NULL);
+               int ret = execl(path,barra[i],files[0],files[1],NULL);
                perror("error executing command");
                _exit(ret);
             }
@@ -233,7 +234,7 @@ int pipe_Line(int argc, char **files,char *trans[], Conf config, int pid){
                 close(p[i-1][0]);
                 dup2(p[i][1],1);
                 close(p[i][1]);
-                int ret = execlp(path,barra[i],files[0],files[1],NULL);
+                int ret = execl(path,barra[i],files[0],files[1],NULL);
                 perror("error executing command");
                 _exit(ret);
             }
@@ -284,15 +285,23 @@ void closer(int signum){
 void send_status(Conf config,int pid){
     char * msg = malloc(2048);
     char * line = malloc(64);
-    strcat(msg, "Current server configuration: (name | maximum processes | available processes)\n");
+    Pedido info = pedidos;
+    strcat(msg, "Current server configuration: \n");
+    while(info){
+        strcat(msg, info->info);
+        info = info->prox;
+    }
     Conf temp = config;
     while (temp){
-        sprintf(line,"%s | %d | %d\n",temp->transformacao,temp->max,temp->atual);
-        strcat(msg,line);   
+        sprintf(line," transf: %s | %d/%d (running/max)\n",temp->transformacao,temp->max - temp->atual,temp->max);
+        strcat(msg,line);
+            
         temp = temp->prox;
+        
     }
     strcat(msg,"Warning: This is a snapshot of a specific time frame, it may not reflect the present status\n");
     reply(msg, pid, 0);
+
 }
 
 
@@ -323,6 +332,7 @@ void handler(int signum){
     pid = waitpid(-1, &status, WNOHANG);
     Pedido temp = pedidos;
     Pedido aux = temp;
+    Pedido ant = NULL;
     int flag = 0;
     while(temp){
         if(temp->pid == pid){
@@ -345,6 +355,23 @@ void handler(int signum){
             }
         l = global;
         }
+        Pedido rem = pedidos;
+        while(rem){
+        if(rem->pid == pid){
+            if(ant){
+                ant->prox = rem->prox;
+                free(rem);
+                break;
+            }
+            else{
+                pedidos = rem->prox;
+                free(rem);
+                break;
+            }
+        }
+        ant = rem;
+        rem = rem->prox;
+    }
     //Conf o = global;
     // printf("-----------------Depois-----------------------\n");
 
@@ -360,7 +387,7 @@ void handler(int signum){
 }
 
 
-void addPedido(int n,char *t[], pid_t pide){
+void addPedido(int n,char *t[], char *f[], pid_t pide){
     Pedido novo;
     novo = malloc(sizeof(struct pedido));
     novo->tamanho = n;
@@ -370,6 +397,12 @@ void addPedido(int n,char *t[], pid_t pide){
         novo->transf[i] = malloc(BUFFSIZE);
         strcpy(novo->transf[i],t[i]);
     }
+    sprintf(novo->info,"Task pid: %d, proc-file %s %s ",novo->pid, f[0], f[1]);
+    for(int i = 0; i < n; i++){
+        strcat(novo->info,t[i]);
+        strcat(novo->info, " ");
+    }
+    strcat(novo->info,"\n");
     Pedido temp = pedidos;
     if(!temp){
         pedidos = novo;
@@ -395,7 +428,7 @@ int main(int argc, char *argv[]) {
     signal(SIGINT, closer);
     signal(SIGTERM, closer);
     global = readConfig(argv[1]);
-
+    sigaction(SIGPIPE, &(struct sigaction){SIG_IGN}, NULL);
     if(mkfifo("tmp/c2s_fifo", 0666) == -1){
         perror("Estourou!\n");
         _exit(-1);
@@ -437,7 +470,7 @@ int main(int argc, char *argv[]) {
                             close(fd[0]);
                             write(fd[1],&pi,sizeof(pi));
                             close(fd[1]);
-                            pipe_Line(process.argc,files,transf,global,process.pid);
+                            pipe_Line(process.argc,files,transf,global,process.pid,argv[2]);
                             reply(
                             "The files have been processed successfully!\n"
                             , process.pid, 1);
@@ -450,7 +483,7 @@ int main(int argc, char *argv[]) {
                             aux = atoi(buff);
                         }
                         close(fd[0]);
-                        addPedido(process.argc-4, transf, aux);
+                        addPedido(process.argc-4, transf, files, aux);
                     } 
                     else{
                         enqueue(&process);
