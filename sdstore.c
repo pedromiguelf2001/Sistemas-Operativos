@@ -22,48 +22,7 @@ void copy_argv(Process *p, int argc, char** argv){
         strcpy(p->argv[i],argv[i]);
     }
 }
-/*
-    Esta função recebe as respostas do servidor através do pipe server to client 
-*/
-void reply(){
-    Reply reply;
-    char * curr = malloc(1024);
-    
-    int s2c_fifo = open(s2c_fifo_name, O_RDONLY);
-    
-    while(1){
-        
-        while (read(s2c_fifo, &reply, sizeof(Reply))>0){
-            for(int i = 0; i < reply.argc; i++){
-                write(1,reply.argv[i],strlen(reply.argv[i]));
-                curr = strcpy(curr,reply.argv[0]);
-                
-                curr = strtok(curr," ");
-                
-            
-            }
-            
-            
-            // if(reply.end_flag==1) printf("Wicked\n");
-            if (!strcmp("The files have been processed successfully!\n", reply.argv[0])){
-                
-                close(s2c_fifo);
-                unlink(s2c_fifo_name);
-                _exit(0);
-                
-            }
-            if(!strcmp(curr,"Current")){
 
-                unlink(s2c_fifo_name);
-                _exit(0);
-            }
-            
-            
-          
-        }
-        
-    }
-}
 /*
     A função recebe um path para um pipe e escreve lá a informação dos 
     processos a serem executados.
@@ -74,8 +33,67 @@ void proc_file(int fd, int argc, char **argv){
     process.pid = pid;
     process.argc = argc;
     copy_argv(&process, argc, argv);
+    printf("Vou escrever\n");
     write(fd, &process, sizeof(Process));
 }
+
+
+/*
+    Esta função recebe as respostas do servidor através do pipe server to client 
+*/
+void reply(int fd, int argc, char ** argv){
+    Reply reply;
+    char * curr = malloc(1024);
+    // printf("Reply\n");
+    int s2c_fifo = open(s2c_fifo_name, O_RDONLY);
+
+    while(1){
+        write(s2c_fifo, &reply, sizeof(Reply));
+        while (read(s2c_fifo, &reply, sizeof(Reply))>0){
+            printf("%s...\n",reply.argv[0]);
+            fflush(stdout);
+            
+            
+            // for(int i = 0; i < reply.argc; i++){
+                
+            //     // write(1,reply.argv[i],strlen(reply.argv[i]));
+            //     // curr = strcpy(curr,reply.argv[0]);
+                
+            //     // curr = strtok(curr," ");
+                
+            
+            // }
+            
+            
+            // if(reply.end_flag==1) printf("Wicked\n");
+            if (!strcmp("The files have been processed successfully!\n", reply.argv[0])){
+                
+                close(s2c_fifo);
+                unlink(s2c_fifo_name);
+                _exit(0);
+                
+            }
+
+            if(!strcmp("Try again\n",reply.argv[0])){
+                printf("Again\n");
+                fflush(stdout);
+                proc_file(fd,argc,argv);
+            }
+
+            if(!strcmp(curr,"Current")){
+                printf("Reply, %d\n", argc);
+            fflush(stdout);
+                unlink(s2c_fifo_name);
+                _exit(0);
+            }
+            
+            
+          
+        }
+        
+    }
+}
+
 
 // A função fecha o pipe server to client
 void closer(int signum){
@@ -86,7 +104,7 @@ void closer(int signum){
 int main(int argc, char** argv){
     signal(SIGINT, closer);
     signal(SIGTERM, closer);
-    signal(SIGSEGV,closer);
+    //signal(SIGSEGV,closer);
     signal(SIGQUIT,closer);
     fflush(stdout);
     sprintf(s2c_fifo_name, "tmp/%d",(int)getpid());
@@ -126,9 +144,9 @@ int main(int argc, char** argv){
         int c2s_fifo = open("tmp/c2s_fifo", O_WRONLY);
         
         proc_file(c2s_fifo, argc, argv);
-        close(c2s_fifo);
-        reply();
         
+        reply(c2s_fifo,argc, argv);
+        close(c2s_fifo);
     }
     // Comandos inexistentes
     else{
