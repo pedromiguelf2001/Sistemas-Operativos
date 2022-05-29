@@ -22,13 +22,8 @@ typedef struct pedido{
     char *transf[20];
     pid_t pid;
     struct pedido *prox;
+    char info[1024];
 } *Pedido;
-
-
-typedef struct processos {
-    Process p;
-    struct processos *prox;
-} *Processos;
 
 int server_pid;
 Conf global;
@@ -41,10 +36,8 @@ int fq = 0;
 ssize_t readln(int fd, char *line, size_t size) {
 	ssize_t res = 0;
 	ssize_t i = 0;
-
 	while ((res = read(fd, &line[i], size)) != 0 && ((char) line[i] != '\n'))
 		i += res;
-
 	return i;
 }
 
@@ -54,7 +47,6 @@ void reply(char* msg, int client, int end_flag){
     strcpy(reply.argv[0], msg);
     reply.argc = 1;
     reply.end_flag = end_flag;
-    
     int s2c_fifo;
     char path[256];
     sprintf(path, "tmp/%d",client);
@@ -64,7 +56,6 @@ void reply(char* msg, int client, int end_flag){
     } 
     write(s2c_fifo,&reply,sizeof(Reply));
     close(s2c_fifo);
-
     if (end_flag) unlink(path);
 }
 
@@ -82,10 +73,8 @@ Conf readConfig(char *config){
         perror("Error opening file!!");
         _exit(-1);
     }
-
     Conf curr, prev, temp;
     curr = prev = temp = NULL;
-
     // 1 é o tamanho do buffer, aqui lemos caracter a caracter
     while(readln(fd, line, 1) > 0){
         temp = malloc(sizeof(struct lligada));
@@ -95,7 +84,6 @@ Conf readConfig(char *config){
         else{
             curr = temp;
         }
-        
         //guarda o nome da tranformação
         delimiter = strtok(line," ");
         temp->transformacao = malloc(sizeof(line) * (strlen(delimiter)+1));
@@ -106,10 +94,9 @@ Conf readConfig(char *config){
         temp->max = atoi(delimiter);
         temp->atual = temp->max;
         temp->prox = NULL;
-        printf("%s | %d | %d\n",temp->transformacao, temp->max, temp->atual);
         prev = temp;
-        }
-        return curr;
+    }
+    return curr;
 }
 
 
@@ -121,16 +108,15 @@ int possivel(int n, char *trans[], Conf config){
         for(int j = i; j < n; j++){
             if(!strcmp(trans[i],trans[j])){
                 count++;
-                }   
-            }
+            }   
+        }
         temp = config; 
         while(temp){
         if(!strcmp(trans[i],temp->transformacao)){
             if(count > temp->max) return 0;
-            }
-            temp = temp->prox;
         }
-        
+        temp = temp->prox;
+        }
     }
     return 1;
 }
@@ -143,16 +129,15 @@ int possivel_atual(int n, char * trans[], Conf config){
         for(int j = i; j < n; j++){
             if(!strcmp(trans[i],trans[j])){
                 count++;
-                }   
-            }
+            }   
+        }
         temp = config; 
         while(temp){
-        if(!strcmp(trans[i],temp->transformacao)){
-            if(count > temp->atual) return 0;
+            if(!strcmp(trans[i],temp->transformacao)){
+                if(count > temp->atual) return 0;
             }
             temp = temp->prox;
         }
-        
     }
     return 1;
 }
@@ -165,9 +150,8 @@ int possivel_atual(int n, char * trans[], Conf config){
 
 
 
-int pipe_Line(int argc, char **files,char *trans[], Conf config, int pid){
+int pipe_Line(int argc, char **files,char *trans[], Conf config, int pid, char* caminho){
     int comandos = argc - 4;
-    printf("Numero de Comandos %d\n",comandos);
     Conf temp = config;
     int n_pipes = comandos-1;
     int p[n_pipes][2];
@@ -178,13 +162,21 @@ int pipe_Line(int argc, char **files,char *trans[], Conf config, int pid){
        strcat(t,trans[j]);
        barra[j] = t;
     }
+
+
+
     if(!strcmp("nop", trans[0]) && comandos == 3){
-        printf(("Juro que nao meti nada na bebida\n"));
+        printf(("A dormir...\n"));
         sleep(10);
+        printf("Acordou...\n");
     }
+
+
+
+
     for(int i = 0; i < comandos; i++){
         char* path = malloc(BUFFSIZE);
-        strcat(path,"Functions/");
+        strcpy(path,caminho);
         strcat(path,trans[i]);
         int ori;
         int dest;
@@ -197,7 +189,7 @@ int pipe_Line(int argc, char **files,char *trans[], Conf config, int pid){
             if(fork() == 0){
                 dup2(dest,1);
                 dup2(ori,0);
-                int ret = execlp(path,barra[i],files[0],files[1],NULL);
+                int ret = execl(path,barra[i],files[0],files[1],NULL);
                 perror("error executing command");
                 _exit(ret);
             } 
@@ -213,7 +205,7 @@ int pipe_Line(int argc, char **files,char *trans[], Conf config, int pid){
                dup2(p[i][1],1);
                dup2(ori,0);
                close(p[i][1]);
-               int ret = execlp(path,barra[i],files[0],files[1],NULL);
+               int ret = execl(path,barra[i],files[0],files[1],NULL);
                perror("error executing command");
                _exit(ret);
            }
@@ -226,7 +218,7 @@ int pipe_Line(int argc, char **files,char *trans[], Conf config, int pid){
                dup2(p[i-1][0],0);
                dup2(dest,1);
                close(p[i-1][0]);
-               int ret = execlp(path,barra[i],files[0],files[1],NULL);
+               int ret = execl(path,barra[i],files[0],files[1],NULL);
                perror("error executing command");
                _exit(ret);
             }
@@ -242,7 +234,7 @@ int pipe_Line(int argc, char **files,char *trans[], Conf config, int pid){
                 close(p[i-1][0]);
                 dup2(p[i][1],1);
                 close(p[i][1]);
-                int ret = execlp(path,barra[i],files[0],files[1],NULL);
+                int ret = execl(path,barra[i],files[0],files[1],NULL);
                 perror("error executing command");
                 _exit(ret);
             }
@@ -252,7 +244,6 @@ int pipe_Line(int argc, char **files,char *trans[], Conf config, int pid){
             }
        }
     }
-    printf("Complete %s, com %d comandos\n",trans[0],comandos);
     return 0;
 }
 
@@ -265,23 +256,21 @@ int atualiza_Struct(int n, char *trans[],char **files, Conf config, int pid){
                     temp->atual = temp->atual - 1;
                     break;
                 }
-                else{
-                    return 0;
-                }
+                else return 0;
             }
             temp = temp->prox;
         }
         temp = config;
     }
-    Conf ola = config;
-    printf("-----------------Atual-----------------------\n");
+    // Conf ola = config;
+    // printf("-----------------Atual-----------------------\n");
 
-        while(ola){
-            printf("%s | %d | %d\n",ola->transformacao,ola->max,ola->atual);
+    //     while(ola){
+    //         printf("%s | %d | %d\n",ola->transformacao,ola->max,ola->atual);
             
-            ola = ola->prox;
-            fflush(stdout);   
-        }
+    //         ola = ola->prox;
+    //         fflush(stdout);   
+    //     }
     return 1;
 }
 
@@ -296,11 +285,15 @@ void closer(int signum){
 void send_status(Conf config,int pid){
     char * msg = malloc(2048);
     char * line = malloc(64);
-    
-    strcat(msg, "Current server configuration: (name | maximum processes | available processes)\n");
+    Pedido info = pedidos;
+    strcat(msg, "Current server configuration: \n");
+    while(info){
+        strcat(msg, info->info);
+        info = info->prox;
+    }
     Conf temp = config;
     while (temp){
-        sprintf(line,"%s | %d | %d\n",temp->transformacao,temp->max,temp->atual);
+        sprintf(line," transf: %s | %d/%d (running/max)\n",temp->transformacao,temp->max - temp->atual,temp->max);
         strcat(msg,line);
             
         temp = temp->prox;
@@ -310,25 +303,23 @@ void send_status(Conf config,int pid){
     reply(msg, pid, 0);
 
 }
+
+
 void enqueue(Process *pro){
     queue[fq].pid = pro->pid;
-    //printf("pid: %d\n",queue[fq].pid);
     queue[fq].argc = pro -> argc;
     for(int i = 0; i < queue[fq].argc; i++){
         strcpy(queue[fq].argv[i],pro->argv[i]);
     }
     fq++;
-    printf("Fim enqueue, fq : %d\n",fq);
 }
 void dequeue(){
     if(iq < fq){
-            printf("Dequeue\n");
         int try_again = open("tmp/c2s_fifo",O_WRONLY);
         write(try_again,&queue[iq],sizeof(Process));
         close(try_again);
         iq++;
     }
-    printf("Fim Dequeue\n");
 }
 
 
@@ -339,52 +330,64 @@ void handler(int signum){
     pid_t pid;
     int status;
     pid = waitpid(-1, &status, WNOHANG);
-    printf("Pid handler %d\n",pid);
-    fflush(stdout);
     Pedido temp = pedidos;
     Pedido aux = temp;
+    Pedido ant = NULL;
     int flag = 0;
     while(temp){
         if(temp->pid == pid){
-            printf("IGUAL\n");
             flag = 1;
             aux = temp;
         }
         temp = temp->prox;
     }
     if(flag){
-    for(int i = 0; i < aux->tamanho; i++){
-        while(l){
-            if(!strcmp(l->transformacao,aux->transf[i])){
-                if(l->atual >= 0){
-                    l->atual = l->atual + 1;
-                    
-                    break;
-                }
-                else{
-                    return;
-                }
+        for(int i = 0; i < aux->tamanho; i++){
+            while(l){
+                if(!strcmp(l->transformacao,aux->transf[i])){
+                    if(l->atual >= 0){
+                        l->atual = l->atual + 1; 
+                        break;
+                    }
+                else return;
+                }   
+                l = l->prox;
             }
-            l = l->prox;
-        }
         l = global;
-    }
-    Conf o = global;
-    printf("-----------------Depois-----------------------\n");
-
-        while(o){
-            printf("%s | %d | %d\n",o->transformacao,o->max,o->atual);
-            
-            o = o->prox;
-            fflush(stdout);   
         }
+        Pedido rem = pedidos;
+        while(rem){
+        if(rem->pid == pid){
+            if(ant){
+                ant->prox = rem->prox;
+                free(rem);
+                break;
+            }
+            else{
+                pedidos = rem->prox;
+                free(rem);
+                break;
+            }
+        }
+        ant = rem;
+        rem = rem->prox;
+    }
+    //Conf o = global;
+    // printf("-----------------Depois-----------------------\n");
+
+    //     while(o){
+    //         printf("%s | %d | %d\n",o->transformacao,o->max,o->atual);
+            
+    //         o = o->prox;
+    //         fflush(stdout);   
+    //     }
         dequeue();
     }
     
 }
 
 
-void addPedido(int n,char *t[], pid_t pide){
+void addPedido(int n,char *t[], char *f[], pid_t pide){
     Pedido novo;
     novo = malloc(sizeof(struct pedido));
     novo->tamanho = n;
@@ -394,6 +397,12 @@ void addPedido(int n,char *t[], pid_t pide){
         novo->transf[i] = malloc(BUFFSIZE);
         strcpy(novo->transf[i],t[i]);
     }
+    sprintf(novo->info,"Task pid: %d, proc-file %s %s ",novo->pid, f[0], f[1]);
+    for(int i = 0; i < n; i++){
+        strcat(novo->info,t[i]);
+        strcat(novo->info, " ");
+    }
+    strcat(novo->info,"\n");
     Pedido temp = pedidos;
     if(!temp){
         pedidos = novo;
@@ -415,28 +424,26 @@ int main(int argc, char *argv[]) {
     int fd[2];
     int status;
     server_pid = getpid();
-    printf("%d\n", server_pid);
     signal(SIGCHLD,handler);
     signal(SIGINT, closer);
     signal(SIGTERM, closer);
-    //signal(SIGSEGV, closer);
     global = readConfig(argv[1]);
-    if (mkfifo("tmp/c2s_fifo", 0666) == -1){
+    sigaction(SIGPIPE, &(struct sigaction){SIG_IGN}, NULL);
+    if(mkfifo("tmp/c2s_fifo", 0666) == -1){
         perror("Estourou!\n");
         _exit(-1);
     }
-    if ( mkfifo("tmp/waiting", 0666) == -1){
+    if( mkfifo("tmp/waiting", 0666) == -1){
         perror("Read - Waiting Room");
         _exit(-1);
     }
+
     Process process;
+
     while(1){
         // Abre o pipe Client to server
         int c2s_fifo = open("tmp/c2s_fifo", O_RDONLY,0666);
         while(read(c2s_fifo,&process, sizeof(Process)) > 0){
-            
-            printf("Entrou\n");
-
             if(process.argc == 2 && !strcmp(process.argv[1],"status")){         
                 send_status(global, process.pid);
             }
@@ -452,51 +459,37 @@ int main(int argc, char *argv[]) {
                     strcpy(transf[i],process.argv[i+4]);
                 }
                 pipe(fd);
-                
+
                 if(possivel(process.argc-4,transf,global)){
-
-                    
-
                     if(possivel_atual(process.argc-4, transf,global)){
-
-
-
-
                         atualiza_Struct(process.argc-4, transf,files, global,process.pid);
                         if(fork() == 0){
                             pid_t pide = getpid();
-                            printf("Pid FORk %d\n",pide);
-                            fflush(stdout);
                             char pi[BUFFSIZE];
                             sprintf(pi,"%d",pide);
                             close(fd[0]);
                             write(fd[1],&pi,sizeof(pi));
                             close(fd[1]);
-                            pipe_Line(process.argc,files,transf,global,process.pid);
+                            pipe_Line(process.argc,files,transf,global,process.pid,argv[2]);
                             reply(
                             "The files have been processed successfully!\n"
                             , process.pid, 1);
                             _exit(0);
+                        }
+                        close(fd[1]);
+                        char buff[BUFFSIZE];
+                        int aux = 0;
+                        while(read(fd[0],&buff,BUFFSIZE)>0){
+                            aux = atoi(buff);
+                        }
+                        close(fd[0]);
+                        addPedido(process.argc-4, transf, files, aux);
+                    } 
+                    else{
+                        enqueue(&process);
                     }
-
-                    close(fd[1]);
-                    char buff[BUFFSIZE];
-                    int aux = 0;
-                    while(read(fd[0],&buff,BUFFSIZE)>0){
-                        aux = atoi(buff);
-                    }
-                    close(fd[0]);
-                    addPedido(process.argc-4, transf, aux);
-
-                } 
-                else{
-                    enqueue(&process);
                 }
-
-                
-            
-            }
-            else{
+                else{
                     write(1,"Wrong number of transformations",strlen("Wrong number of transformations"));
                     return -1;
                 }

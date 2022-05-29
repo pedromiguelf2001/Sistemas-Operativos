@@ -33,7 +33,6 @@ void proc_file(int fd, int argc, char **argv){
     process.pid = pid;
     process.argc = argc;
     copy_argv(&process, argc, argv);
-    printf("Vou escrever\n");
     write(fd, &process, sizeof(Process));
 }
 
@@ -44,28 +43,23 @@ void proc_file(int fd, int argc, char **argv){
 void reply(int fd, int argc, char ** argv){
     Reply reply;
     char * curr = malloc(1024);
-    // printf("Reply\n");
     int s2c_fifo = open(s2c_fifo_name, O_RDONLY);
-
     while(1){
         write(s2c_fifo, &reply, sizeof(Reply));
         while (read(s2c_fifo, &reply, sizeof(Reply))>0){
-            printf("%s...\n",reply.argv[0]);
-            fflush(stdout);
-            
-            
-            // for(int i = 0; i < reply.argc; i++){
+            for(int i = 0; i < reply.argc; i++){
+                if(reply.argc != 1024){
+                    write(1,reply.argv[i],strlen(reply.argv[i]));
+                    curr = strcpy(curr,reply.argv[0]);
                 
-            //     // write(1,reply.argv[i],strlen(reply.argv[i]));
-            //     // curr = strcpy(curr,reply.argv[0]);
+                    curr = strtok(curr," ");
+                }
                 
-            //     // curr = strtok(curr," ");
                 
             
-            // }
+            }
             
             
-            // if(reply.end_flag==1) printf("Wicked\n");
             if (!strcmp("The files have been processed successfully!\n", reply.argv[0])){
                 
                 close(s2c_fifo);
@@ -74,15 +68,8 @@ void reply(int fd, int argc, char ** argv){
                 
             }
 
-            if(!strcmp("Try again\n",reply.argv[0])){
-                printf("Again\n");
-                fflush(stdout);
-                proc_file(fd,argc,argv);
-            }
-
             if(!strcmp(curr,"Current")){
-                printf("Reply, %d\n", argc);
-            fflush(stdout);
+                fflush(stdout);
                 unlink(s2c_fifo_name);
                 _exit(0);
             }
