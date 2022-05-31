@@ -43,10 +43,10 @@ void proc_file(int fd, int argc, char **argv){
 void reply(int fd, int argc, char ** argv){
     Reply reply;
     char * curr = malloc(1024);
-    int s2c_fifo = open(s2c_fifo_name, O_RDONLY);
+    int s2c_fifo = open(s2c_fifo_name, O_RDONLY); //Abre o pipe em questão com a intenção de o ler
     while(1){
         write(s2c_fifo, &reply, sizeof(Reply));
-        while (read(s2c_fifo, &reply, sizeof(Reply))>0){
+        while (read(s2c_fifo, &reply, sizeof(Reply))>0){ //Enquanto estiver a ler
             for(int i = 0; i < reply.argc; i++){
                 if(reply.argc != 1024){
                     write(1,reply.argv[i],strlen(reply.argv[i]));
@@ -59,7 +59,7 @@ void reply(int fd, int argc, char ** argv){
             
             }
             
-            
+            //Compara as 2 strings, se forem diferentes então fecha o pipe
             if (!strcmp("The files have been processed successfully!\n", reply.argv[0])){
                 
                 close(s2c_fifo);
